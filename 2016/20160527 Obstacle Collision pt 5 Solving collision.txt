@@ -1,0 +1,105 @@
+Having info that there is collision between two objects there is nothing more left but solving the collision. What I want to do is to move object away so that there is no longer a collision, and to do this by doing as little movement of objects as possible. So Rather than having info that collision happened, I need to have info what kind of collision happened - in what axis objects collided and how much of objects are colliding. This is exactly the same thing I did in circle-circle collision, just way more generic case.
+
+High level implementation should do something like this: find collision displacement (axis and collision size) and move object along this axis (it should point out of the object) by the size of collision - this will put game object outside of obstacle boundaries.
+
+```csharp
+private void CalculateCollisions(IGameObject o1)
+{
+	foreach (var obstacle in Obstacles)
+	{
+		var collisionDisplacement = ObstacleCollide(obstacle, o1);
+		if (collisionDisplacement != null)
+		{
+			// Item1 - axis unit vector, Item2 collision size
+			var collisionFix = collisionDisplacement.Item1.Scale(collisionDisplacement.Item2);
+			o1.Position = o1.Position.Add(collisionFix);
+		}
+	}
+}
+```
+
+This means I have to update my collision detection code. I am storing smallest collision values in variable and updating it whenever I find collision with smaller size then previously found. Still in case of finding out that there is no collision, code quits quickly and returns null.
+
+```csharp
+private Tuple<Vector2d, double> ObstacleCollide(Obstacle obstacle, IGameObject gameObject)
+{
+	var smallestDisplacement = Tuple.Create(new Vector2d(0, 0), new Range(double.MinValue, double.MaxValue));
+
+	foreach (var axisVector in GetAxisVectors(obstacle, gameObject))
+	{
+		var obstacleProjection = ProjectOntoAxis(axisVector, obstacle);
+		var objectProjection = ProjectOntoAxis(axisVector, gameObject);
+
+		var intersectionRange = obstacleProjection.Intersect(objectProjection);
+
+		if (intersectionRange.Length < 0.0001)
+			return null;
+
+		if (intersectionRange.Length < smallestDisplacement.Item2.Length)
+			smallestDisplacement = Tuple.Create(axisVector, intersectionRange);
+	}
+
+	return Tuple.Create(smallestDisplacement.Item1, smallestDisplacement.Item2.Length);
+}
+```
+
+That should be it. And, to my surprise, it works. Well, at least it works for some sides of the object. Those that are most to the left and top. Why is that? Well, this obstacle I'm testing my code with is rectangle. This means there are parallel sides which in turn share the same normal axis (just with different sign, so on may point upward, while the second one will point downward). When creating axis vector it is converted into unit vector and this means it starts in point (0, 0). That is OK for detecting collisions, but since those axes may differ only in sign, it means that intersection size will be the same for both of them! True - ranges themlseves will be different, but length of intersection, used to verify if collison is smaller or larger at this axis, will be the same so the code will find first axis with collision (for example the top one), record that it has collision size for example `1` and then move to the right and finally bottom side (I'm building my polygons so that points are ordered clockwise). But since bottom side also has collison size of `1` collision axis will not get updated even though player comes from the bottom side of the rectangle. This means algorithm will try to push player to the top a little bit, actually pushing player inside obstacle, not outside! And this will repeat for every frame until object is ejected either from top of rectangle or from the sides (left side to be precise) if rectangle happens to be higher than wider.
+
+This cannot stay that way. So to fix this I had to figure out where the mistake is. And after a while I got it - I cannot look just at the size of collision, but rather at distance of collision from beginning of obstacle's side. Or, to put it in other words, I have to adjust intersection range by how far the side is, not keep it from axis origin (point 0, 0). How far is side form axes origin? Well, it is exactly `axis dotProduct sideOriginPoint` away!
+
+Little update to my axis generator. Now it returns axis and numeric value saying how far polygon side is form 0,0 point. And this is how much I have to move my intersection region.
+
+```csharp
+private IEnumerable<Tuple<Vector2d, double>> GetAxisVectors(Obstacle obstacle, IGameObject gameObject)
+{
+	var prevPoint = obstacle.Points[0];
+
+	for (int i = 1; i <= obstacle.Points.Length; i++)
+	{
+		var currentPoint = obstacle.Points[i % obstacle.Points.Length];
+		var sideVector = currentPoint.Subtract(prevPoint);
+		var axisVector = sideVector.Unit().Normal();
+		var displacementFromOrigin = axisVector.DotProduct(prevPoint);
+		yield return Tuple.Create(axisVector, -displacementFromOrigin);
+		prevPoint = currentPoint;
+	}
+
+	for (int i = 0; i < obstacle.Points.Length; i++)
+	{
+		var circleToPointVector = gameObject.Position.Subtract(obstacle.Points[i]).Unit();
+		var displacementFromOrigin = circleToPointVector.DotProduct(obstacle.Points[i]);
+		yield return Tuple.Create(circleToPointVector, -displacementFromOrigin);
+	}
+}
+```
+
+And finally adding logic to find smallest collision size possible, and in case sizes are the same, to find the one closer to the origin of the side (closer to the side itself):
+
+```csharp
+private Tuple<Vector2d, double> ObstacleCollide(Obstacle obstacle, IGameObject gameObject)
+{
+	var smallestDisplacement = Tuple.Create(new Vector2d(0, 0), new Range(double.MinValue, double.MaxValue));
+
+	foreach (var axisVector in GetAxisVectors(obstacle, gameObject))
+	{
+		var obstacleProjection = ProjectOntoAxis(axisVector.Item1, obstacle);
+		var objectProjection = ProjectOntoAxis(axisVector.Item1, gameObject);
+
+		var intersectionRange = obstacleProjection.Intersect(objectProjection);
+		intersectionRange = intersectionRange.Add(axisVector.Item2);
+
+		if (intersectionRange.Length < 0.0001)
+			return null;
+
+		if (intersectionRange.Length < smallestDisplacement.Item2.Length ||
+			(Math.Abs(intersectionRange.Length - smallestDisplacement.Item2.Length) < 0.0001 && Math.Abs(intersectionRange.Start) < Math.Abs(smallestDisplacement.Item2.Start)))
+			smallestDisplacement = Tuple.Create(axisVector.Item1, intersectionRange);
+	}
+
+	return Tuple.Create(smallestDisplacement.Item1, smallestDisplacement.Item2.Length);
+}
+```
+
+The if condition seems bit large, but it is pretty simple: if collision size is smaller than the smallest one found until now - we have new smallest collison. But if it happenes to be the same (comparing doubles with small tolerance) - check if new collision intersection happens to be closer to axis origin, and if so - update smallest collision.
+
+And now it works for all sides of the rectangle, never letting player inside obstacle.

@@ -1,0 +1,11 @@
+While I'm having fun with `CoffeeScript` those last few days, to try it out I'm creating plain old `HTML` pages sometimes. Just a simple, messy html to see how script behaves in browser. Of course to do that script must be either part of `html` file itself or included into it using `script` tag. Simple enough, done that like hundred times over the last few years.
+
+But apparently doing something many times does not mean you will do it correctly next time. Or you will know how to do it correctly. An hour ago I would not be able to tell what's wrong with this file:
+[gist]http://gist.github.com/pako1337/5331752[/gist]
+Seems correct, doesn't it? All tags closed, all tags present. Sure - that's not the nicest `html` you will see, but should do the job. Yet, there is small, but serious issue that will cause `JavaScript` code not to be executed. It's the self closing `script` tag.
+This StackOverflow discussion gives detailed answer to the problem: <a href="http://stackoverflow.com/questions/69913/why-dont-self-closing-script-tags-work" title="Why don't self-closing script tags work?" target="_blank">Why don't self-closing script tags work?</a>.
+But just to sum it up - you will either need to explicitly mark that your document's MIME type is `application/xhtml+xml` or use explicit closing in `script` tag. This is because browsers interpret tags in some way that causes them to generate content different than expected. For example, the above code could end up with `html` looking like:
+[gist]https://gist.github.com/pako1337/5331801[/gist]
+The alert is out of the `script` section, causing it to be interpreted as normal `html` which is rubbish.
+
+So this was a good day - learnt something new. Hope you learnt something too!

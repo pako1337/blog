@@ -1,0 +1,21 @@
+So there is a rectangle. And there is a circle. How to figure out if they are overlaping? Unfortunately there is no easy formula like for circles, or few ifs to do it (like for multiple rectangles). But this does not mean there is no way to do it at all. Meet Separating Axis Theorem.
+
+It is really simple actually. Given two convex shapes (shapes where all internal angles are less or equal to 180 degrees), there will be at least one line you can draw that will not cross any of those shapes - you do not have collision. If there is no such line to be drawn, collision is certain.
+
+SAT 1.png
+
+What at first may seem very tricky is - how to find whether such line exists at all. Human eyes are extremely good at this, after all you can spot collision immediately (unles objects are really, really close to each other). But mathematically or algorithmically speaking this must be hard, right? No. In fact, it comes down just to few operations, none of them complex at all, to get the right answer.
+
+SAT says that there will be a way to draw the line between two objects to exclude collision possibility. But checking every possible line will not be easy. Here comes axis part. If there is a line that goes between two objects without touching any one of them, it means that there must be axis (perpendicular to that line), onto which we could project our shapes and get a hole between both shapes' projections.
+
+SAT 2.png
+
+But back to the issue. If I don't know where to draw the line, it is basically the same problem - what axes to check? I can't check every one of them (counting to infinity take a very long time). But there is no need to check every one. What has to be checked is only a set of axes related to set of shapes' sides. But not the ones matching the sides, but rather the ones matching normal vectors shape's side. Normal vector is vector pointing at 90 degrees angle from another vector (we can assume that shape's side is a vector). Why normal vectors?
+
+SAT 3.png
+
+Check those two triangles. Clearly not colliding, and yet, if you were to check only the axes aligned with triangles' sides, you will see that there is no spacing between them on any of those axis. And if there is overlaping area on every axis, there is a collision. That would be wrong result. But if there are separating lines, at least one of them will be parallel to one of the shapes' side. Given this, I know I only need to check axes perpendicular to shapes' sides (since resulting line is "represented" by empty space on axis with objects projections).
+
+Hope this makes sense, since the idea is pretty smart and works really well. If you want to have a little bit of fun with interactive presentations of this problems, check out [this tutorial](http://www.metanetsoftware.com/technique/tutorialA.html "N Tutorial") where there is a great explenation of how this works in **N** game. Great game too!
+
+Next time I will dive into code directly, so make sure you get the idea. Feel free to ask any question, I will clear things up as good as I can.

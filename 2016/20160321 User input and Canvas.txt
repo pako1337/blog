@@ -1,0 +1,35 @@
+With player's token displayed on screen, next step would be to actually provide player with any interaction with application. Standing still is not much fun I think. Time to handle user input.
+
+My first thought was to do it like this:
+
+```javascript
+var keyDown = function (e) {
+	console.log(e.keyCode);
+
+
+(function init() {
+	players = args.playersList || new PlayersList(args.playersListOptions);
+	var canvas = document.createElement("canvas");
+	canvas.addEventListener("keydown", keyDown);
+	arena.appendChild(canvas);
+	drawingContext = canvas.getContext("2d");
+})();
+```
+
+However, to my surprise, that does not work at all. Nothing got logged to console, no matter how hard I pressed those keys, no matter how many times I clicked on canvas area to make it focus.
+
+Focus. Canvas. Yea, not gonna work. Canvas does not capture focus it seems. Makes sense, at least at some level. How to work around it? First idea was to attach event listener to document directly. And while it sounds reasonable, I thought that there must be other solution.  
+Five minutes with google and I have it:
+
+```javascript
+var canvas = document.createElement("canvas");
+canvas.setAttribute("tabindex", 1);
+canvas.addEventListener("keydown", keyDown);
+arena.appendChild(canvas);
+```
+
+Notice setting `tabindex` attribute. Turns out it is quite well know (among UI programmers I guess) workaround - setting tab index on any element will make it focusable. That, too, makes some sense. But unfortunately it gives blue border around canvas. This I guess could be handled by CSS styling of the element.
+
+But dirty tricks like that in code, especially at the begining, might bite back in future. Will I remember what is this useless attribute there for in month or two? Knowing myself - absolutely not. And it is just one step away from removing it thinking I've just optimised the code. And broke it at the same time, but who's counting?
+
+I guess I will go with attaching listeners directly to document object then. That makes more sense to me.

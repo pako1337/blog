@@ -1,0 +1,72 @@
+Have you ever considered using Perl to make your work easier? I know I didn't. I didn't know Perl at all, never used it, hardly even know how the code can look. Friend once joked that Perl is write-only language since you will never be able to understand the code you wrote a month ago. Of course if you're lucky enough you are coding your everyday work code in C# or Java and you have all you could wish for. If, on the other hand, you are adventurous, like me, you are working with a language used by approximately 1523 (estimates by me) people in the world which does nothing good except for making your life harder.
+
+So I'm integrating two systems. Fun. What's not fun is that the data is shared using FTP and CSV files. What's not fun even more is when your colleagues decide that normal CSV is lame file format and they decide to make some customization. So now we have TSV - Tilde Separated Values! Why tilde (~)? Because it probably won't show up in the data, while commas probably will. You can escape commas in strings using quotes? Yea, but that's lame.
+
+Now, all reasonably engineered software would allow to specify separator when importing CSV into memory object. But read the first paragraph - I'm working with language that let's me read whole file into memory, but not line by line. It let's me find characters, but substrings must be done manually. No split or regex support. No fun at all. And I need to get that CS... TSV file into memory. It also needs to run on production, where may be no Java, .NET etc. And you get your permissions limited. And time limited. And people are looking at you funny when you want something installed.
+
+But I know that Perl is there and some people wrote some stuff in it. It is also known for great support of regular expressions which is something I was looking for. So I started Google, learned how to read and write file (and that's amazingly nice and easy!) and then spent two or three hours trying to figure out regex that will do what I want. Find any string with comma in it, select the whole column (either from line start or from tilde to line end or next tilde). When you have this pattern, replace it with quoted string. Then replace all tildes with commas. Sounds easy when said that way. But try putting it to a regex, my friend, and you are knocking on those special madness doors that we have deep inside us.
+
+Code for detecting strings with comma is simple:
+    [sourcecode language="perl"].*,.*```
+
+which translates to any character 0 or more times, then comma, then any character 0 or more times.
+
+We have first problem: string can start either at beginning of line of from a tilde, so we have something like this:
+    [sourcecode language="perl"](^|~)```
+
+^ is for line start, ~ for tilde. Pipe "|" is or operator and we are limiting this or with parenthesis. And what about end of line? That's very similar:
+    [sourcecode language="perl"](~|$)```
+
+$ is for line end, rest the same as above.
+    [sourcecode language="perl"](^|~).*,.*(~|$)```
+
+Will it work? Sure. Will it work as intendet? Not-at-all. Regex usually try to find the longes possible matching string, which will give us wrong results. We want to select just a column, not whole line! Se the sample script below:
+[sourcecode language="perl"]
+    #!user/bin/perl
+
+    my $string = "1 2 3~1, 2 3~1 2 3";
+
+    print "$string\n";
+    $string =~ s/(^|~).*,.*(~|$)/"$&"/;
+    print "$string\n";
+```
+
+and sample output:
+    `1 2 3~1, 2 3~1 2 3
+    "1 2 3~1, 2 3~1 2 3"`
+
+Definitely not what we are looking for. By the way, $& is perl's way to say - give me the whole matched pattern. Sure there must be something to tell regex engine to pick just the shortest possible match. This operator is "?". We can add it after operators like * or +.
+    [sourcecode language="perl"]$string =~ s/(^|~).*?,.*?(~|$)/"$&"/;```
+
+We're getting there slowly, now output is:
+    `1 2 3~1, 2 3~1 2 3
+    "1 2 3~1, 2 3~"1 2 3`
+
+So the pattern ended earlier, but still starts at the beginning of line instead of tilde. Why? Because we said that our string can contain any character (dot "." operator), while in fact it cannot. It cannot contain tilde character, since this would mean we're getting to the next column.
+    [sourcecode language="perl"]$string =~ s/(^|~)[^~]*?,[^~]*?(~|$)/"$&"/;```
+
+almost there:
+    `1 2 3~1, 2 3~1 2 3
+    1 2 3"~1, 2 3~"1 2 3`
+
+The only problem now is that tildes are included into matched patter, but we would rather leave them out. Can we? Sure we can, hold on, that one's fun!
+    [sourcecode language="perl"]$string =~ s/(^|(?&lt;=~))[^~]*?,[^~]*?((?=~)|$)/"$&"/;
+
+And we're finally there:
+    `1 2 3~1, 2 3~1 2 3
+    1 2 3~"1, 2 3"~1 2 3`
+
+Exactly what we wanted! What we did there? We've applied look-behind and look-ahead operators to tildes. Those are called zero-width assertions, meaning that they will check for matching character, but will not include this character into selected match itself. ?&lt;= is look-behind (check if there is character defined before the match) and ?= is look-ahead (check if after the match there is character). Testing it on more lengthy string shows one more, small issue:
+    `1, 2 3~1 2 3~1, 2 3~1 2 3~1 2, 3
+    "1, 2 3"~1 2 3~1, 2 3~1 2 3~1 2, 3`
+
+Only first match was selected. By default perl regex will look just for a first match in line, but if at the end you will add option g, it will look for all matches.
+    [sourcecode language="perl"]$string =~ s/(^|(?&lt;=~))[^~]*?,[^~]*?((?=~)|$)/"$&"/g;```
+
+And our final output is:
+    `1, 2 3~1 2 3~1, 2 3~1 2 3~1 2, 3
+    "1, 2 3"~1 2 3~"1, 2 3"~1 2 3~"1 2, 3"`
+
+Pretty, isn't it? And the whole script to convert one file format to the other took about 8 lines of code + comments for my future self. Is it perfect? No, there are some edge cases I'm sure it will fail, but it is good enough for the data I'm going to work with.
+
+It was extremely easy to reproduce this regex now, that I'm writing this blog post, two days after creating it at work. But figuring this out on Thursday morning was far from easy. I can never remember all those regex operators, where to set up them, how to group variables, create optional characters etc. Reading regular expressions is also pain, seems like bunch of random characters. But the power in them is oh-so-great! Don't over use them. But when there is a clear need for them - don't hesitate! Just add clear comment on what that regex is doing and test it carefully.

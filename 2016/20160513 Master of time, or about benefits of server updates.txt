@@ -1,0 +1,57 @@
+As pointed out in some previous post, there are some disadvantages to calculating newarena state on server only when some client sends update. There is also a disadvantage to sending server updates on every client action - this puts a lot of stress on server (10 players, sending 10 updates a second, would mean server has to send 10x10=100 updates to server per second; 10 updates from client a second is really low number).
+
+First I thought that I will address this simply by having arena raise event every time it thinks update is needed (so 30-60 times per second). After solving initial problem with events in SignalR hubs, it got to me - since there is no hub, there can be a time (and that will often be the case) when there is no one to handle event. Well, that's easy - I will create my own hub. Well, not so fast - you can't just do that. Hubs need to be created by hub pipeline, and it is not something I want to mess with. Well, that's a pity. What should I do?
+
+Thankfully SignalR creators thought about such use case and came up with possible solution. What is required is to create class that will take over some of the hub possibilites, like communicating with clients, make it singleton (well, not necessarily, but it works for me at this point), and subscribe to timer events in this class. This class will always be in memory (at least when I want it to handle my timer request), it will do what it needs and then send updates to clients like normal hub. From client point of view nothing really changes - they will all get normal updates in javascript like before.
+
+Show me the code you say:
+
+```csharp
+public class ArenaTicker
+{
+	private readonly static ArenaTicker _instance = new ArenaTicker(GlobalHost.ConnectionManager.GetHubContext<RaimHub>().Clients);
+	private const int _updateInterval = 1000 / 60;
+
+	private readonly IHubConnectionContext<dynamic> _clients;
+	private readonly Timer _timer;
+
+	public static ArenaTicker Instance {  get { return _instance; } }
+
+	private ArenaTicker(IHubConnectionContext<dynamic> clients)
+	{
+		_clients = clients;
+		_timer = new Timer(UpdateArena, null, _updateInterval, _updateInterval);
+	}
+
+	private void UpdateArena(object state)
+	{
+		var go = RaimHub.arena.UpdatePositions(DateTime.Now);
+		_clients.All.PlayerMoved(go);
+	}
+}
+```
+
+What is going on is - there is private constructor so there will be guaranteed only one instance of this class. In it, it takes hub context. As you can see when creating this instance I'm hooking up to `GlobalHost.ConnectionManager` to get the context. It is slow operation so it should be done rarely, possibly just once per application runtime (or maybe one for each arena I need to update maybe?). This context will get updated with every client that connects, disconnects etc., just like in normal hub. Then there is a timer, that ticks 60 times per second (but easly adjustable to any other frame rate). It will call update on arena and then notify all clients on new arena state.
+Please forgive the little ugliness of the code around getting arena - there is a static instance of this class in hub, I did not move it anywhere else since for a moment it does its job.
+
+One more thing - notice that the code that returns objects to client changed a little bit. Before it looked like this;
+
+```csharp
+_clients.All.PlayerMoved(RaimHub.arena.GameObjects);
+```
+
+This however resulted in issues with collection being changed when iterated over. That's not good, I can't have server crushing every time new player registers or some player shoots. This is now changed to return set of objects that were returned from update method. And it takes care of returning immutable collection when inside lock (to avoid changing collections when doing update to arena state).
+
+```csharp
+public IEnumerable<IGameObject> UpdatePositions(DateTime? updateTimestamp)
+{
+	...
+	lock (_lock)
+	{
+		...
+		return GameObjects.ToArray();
+	}
+}
+```
+
+And now server is running 60 "frames" every second, always having pretty actual state, limitting number of updates to clients and improving on collision detection.

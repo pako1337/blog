@@ -1,0 +1,16 @@
+Time to server some content with Nancy. That is straightforward, and a bit like MS MVC.
+
+
+```csharp
+Get["/"] = parameters => View["Index.html"];
+```
+
+And this will serve my HTML. But just a page is not enough - there is always a need for more. CSS? JavaScript? Maybe some images if you feel fancy enough? Thankfully Nancy comes with built-in convention that covers this for us (at least for basic usage; then again I don't need much at the moment, do I?). As they kindly put in their documentation:
+
+> TL;DR: stick stuff in /Content .. done.
+
+Wouldn't write it better myself ;) New dir; new stylesheet; link it to index page. Done! Just do hard refresh (Ctrl+R in Chrome) to avoid browser cashing and I have my page looking nicely.
+
+**Tip of a day** - in Chrome, go to developer tools (F12), there switch to `Network` tab and mark `Disable cache` checkbox - this way browser will always load all the resources from the server, avoiding cache. This will be done only when dev tools are open so your day-to-day browsing speed will not be impacted. Same goes for FireFox and IE - saves you some nerves when trying to figure out why those damn css aren't working (assuming they are working at all, I'm looking at you, you damn css!).
+
+**ToDo** at some point I will probably need to move onto something better than plain css to simplify style management. Few years back I had brief encounter with Less, but seems to me like Sass is all the rage now. But that's for future - at this point there is no need for big guns.

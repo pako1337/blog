@@ -1,0 +1,84 @@
+You know what's weird? When no one moves, server does nothing. Well, that's not exactly weird, servers are known for being lazy. But that's not the point. It starts to mess things up when you think about bigger picture. First - client still updates positions of objects in every frame, but server does this only when inputs change. What else it does is - it moves one object, checks for collisions, moves another, checks for collisions, it goes on until all objects are updated.
+
+Now think about this case: player shoots bullet in some direction and does nothing more. The server gets notified, updates objects and all, notifies all other players and everyone is good, and no one moves any more. Until few seconds pass, then one player decides it is time to move. This action of course causes server notification, server updates objects one at the time. But - few seconds have passed, so increments in bullet position will be significant. Big enough to, say, materialize behind player it would normally hit. Or, in other case, player may move in position when server last recognized bullet's position and server will find collision with bullet that's no longer there.
+
+Well, I could certainly mess a little bit with how positions are updated on server, come up with algorithm to update positions a fraction of a second at time until longer range is covered. Sure. But this would bring other problems - what if collision happened two seconds ago? That would seriously make players mad - to die two seconds after you thought you've survived, who would like that in any game?
+
+I think it is time to move to more proactive server position. My server side `Arena` object will be the one telling when updates are going to be happening. But first - it needs to have a way to say - yo!, hub, go tell players we've updated their position!
+
+Events you say? Why, yes, events seems to be exactly what I want too. And I did this, removed all client updates from hub code, created event in `Arena`, decided when updates should be triggered (stayed with the same actions as before, just handled in arena, this will not solve the time difference between updates yet), and fired the event. In hub it is handled and notifies client.
+
+```csharp
+public RaimHub()
+{
+	arena.ArenaChanged += Arena_ArenaChanged;
+}
+
+private void Arena_ArenaChanged(object sender, EventArgs e)
+{
+	Clients.All.PlayerMoved(arena.GameObjects);
+}
+```
+
+```csharp
+public class Arena
+{
+	...
+
+	public event EventHandler ArenaChanged;
+
+	public Player RegisterPlayer(string name)
+	{
+		...
+		OnArenaChanged();
+		return player;
+	}
+
+	public void UnregisterPlayer(Player player)
+	{
+		...
+		OnArenaChanged();
+	}
+
+	private DateTime _lastUpdateTime = DateTime.Now;
+	public void UpdatePositions(DateTime? updateTimestamp)
+	{
+		...
+		OnArenaChanged();
+	}
+
+	internal void ProcessInput(PlayerInput input, Player player)
+	{
+		...
+		OnArenaChanged();
+	}
+
+	private void OnArenaChanged()
+	{
+		ArenaChanged(this, EventArgs.Empty);
+	}
+}
+```
+
+Seems alright? Of course not, if this would be that easy I wouldn't write about it. What started happening is - server was sending hundreds, and then thousands of notifications to clients. Every action on client caused even more notification callbacks. This was crazy!
+
+Fortunately it didn't take me long to notice what is going on. Notice how I initialize event handler in constructor. This would be perfectly fine if there was only one instance of hub ever, and with hub disappearing game would finish. But that is not the case. SignalR will manage hubs as it likes. What does it mean? Well, for example new hub may be created for each message from clients. Or two. Or fifteen. Why? I am not entirely sure. But that's what was going on. Lots of hubs being created, each subscribing to event, and then being removed. But not completly - they are still subscribed to event, this not only causes memory leakage, but also my strange behaviour - hundreds and thousands of hubs being in memory of process, each gets notified about arena change, each sends update to player. Nice way to kill a server.
+
+There are two possible solutions here. First - remove event handler subscription before removing object from memory. That could be done in finializer if there was no better way, but there is fortunately - `IDisposable`, ready to be overriden in each hub implementation.
+
+```csharp
+public RaimHub()
+{
+	arena.ArenaChanged += Arena_ArenaChanged;
+}
+
+protected override void Dispose(bool disposing)
+{
+	arena.ArenaChanged -= Arena_ArenaChanged;
+	base.Dispose(disposing);
+}
+```
+
+And that's what I did. Now it works as I hoped for.
+
+And what is the second solution you ask? Weak event pattern. Where you create event which does not count as reference to an object durign garbage collection. It has one problem though - it may still be called as long as the object is in memory. And object not reachable during GC does not mean object is out of memory - it will only be removed when garbage collection happens, which may be very long time since SignalR assumes hub was removed. So `IDisposable` is a winner here.

@@ -1,0 +1,36 @@
+Last time I moved from angle to saving facing direction vector. This simplified calculations at this point and made whole code simpler a lot. I picked unit vector for that, since for most of the cases it is perfectly fine to have just direction info, and not exact point at which player is looking. Key word here is: most. There is one thing it does not allow to do.
+
+I want player to face the cursor of the mouse at all times. Meaning - when player moves mouse, his or her facing direction should reflect that. But also when player moves, facing direction should change as well. If mouse is stationary and player moves around cursor, facing direction needs to change as well. First thing I could do is to recalculate facing position based on last mouse position at every frame (or, to be more precise, every time I update player's position). That will work well for single player. But I also want to update facing direction of all other players. This could be solved by sending position and facing direction update with every recalculation of position. So, if all works well, around 60 times every second. If there are 10 players on arena, this would mean 600 notifications send every second to the server. And much, much more send back to client (every update on server sends back player position to all other players, so for every 1 incoming message there wold be 10 outgoing ones; 600 incoming equals 6000 outgoing messages). But I don't need that. I just want to update facing direction correctly. If only I knew where player's mouse is, I could recalculate facing direction on client.
+
+So I decided to not use unit vector, but rather stay with full vector. This way I have all the data needed to get new facing direction.
+
+```javascript
+var processFrame = function (timestamp) {
+	if (!lastFrameTime)
+		lastFrameTime = timestamp;
+	
+	var timeDiff = (timestamp - lastFrameTime) / 1000;
+
+	for (var i = 0; i < players.count() ; i++) {
+		var player = players.get(i);
+
+		var directionPoint = { x: player.Position.X + player.FacingDirection.X, y: player.Position.Y + player.FacingDirection.Y };
+		player.Position.X += player.Speed.X * timeDiff;
+		player.Position.Y += player.Speed.Y * timeDiff;
+		player.FacingDirection = calculateFacingDirection(player, directionPoint);
+	}
+
+	gfx.drawArena();
+
+	lastFrameTime = timestamp;
+	requestAnimationFrame(processFrame);
+};
+
+function calculateFacingDirection(player, mouse) {
+	return { X: mouse.x - player.Position.X, Y: mouse.y - player.Position.Y };
+}
+```
+
+First I calculate the point player was looking at last time - I have player's position and facing direction vector. If I add them - I get the point where mouse cursor is on arena. Then getting new position based on speed. And after that - just calculate new facing direction. Do that every frame and player will be looking at mouse coursor like his or her eyes are glued to it.
+
+Also I have moved frame requesting mechanism to arena. This seems more appropriate at this point since I'm doing game logic there and then I just call drawing code which does not care about time, speed of player or anything else anymore. I will probably have to split arena code into separate functionalities at some point too, but for now it is quite short and related to each other so will not do it yet.

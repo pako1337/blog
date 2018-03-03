@@ -1,0 +1,66 @@
+There is communication established between player and server and other players. There is key handling so that player can move his character. But quite soon gamers will notice that they can only move in one direction at the same time. But they cannot move down and right at the same time. Why is that? Javascript only sends one key pressed, the latest key that user pressed, ignoring all other keys that may be down at the same time. Thankfully that can be handled quite easily.
+
+```javascript
+function keyboardInput(args) {
+    var keyPressed = 0;
+
+    var keyDown = function (e) {
+        if (e.which === 87 || e.which === 119 || e.which === 38)
+            keyPressed |= moveDirections.Up;
+
+        if (e.which === 83 || e.which === 115 || e.which === 40)
+            keyPressed |= moveDirections.Down;
+
+        if (e.which === 65 || e.which === 97 || e.which === 37)
+            keyPressed |= moveDirections.Left;
+
+        if (e.which === 68 || e.which === 100 || e.which === 39)
+            keyPressed |= moveDirections.Right;
+
+        if (keyPressed > 0)
+            args.inputChanged({ direction: keyPressed });
+    };
+
+    (function () {
+        document.addEventListener("keydown", keyDown);
+    })();
+};
+```
+
+First - I've extracted keyboard handling into separate file. What it does is - waiting for user input, parsing it - whether it is key game is interested in or not - and notifying application by calling callback `inputChanged`, later on wired to SignalR communication. There is also state variable defined - `keyPressed` - which holds info about all the keys that were pressed, as they are comming in. This is a flag variable - values assigned to it are powers of 2. And each flag, with its own value, are combined together using `or` operator. This alone allows to send multiple keys pressed to server and handle movement.
+
+But since the values are added and never removed - once a key is pressed - it will never be released, causing infinite move. Time to fix that.
+
+```javascript
+function keyboardInput(args) {
+    var keyPressed = 0;
+
+    var keyDown = function (e) {
+		// same as before
+    };
+
+    var keyUp = function (e) {
+        if (e.which === 87 || e.which === 119 || e.which === 38)
+            keyPressed ^= moveDirections.Up;
+
+        if (e.which === 83 || e.which === 115 || e.which === 40)
+            keyPressed ^= moveDirections.Down;
+
+        if (e.which === 65 || e.which === 97 || e.which === 37)
+            keyPressed ^= moveDirections.Left;
+
+        if (e.which === 68 || e.which === 100 || e.which === 39)
+            keyPressed ^= moveDirections.Right;
+
+        if (keyPressed > 0)
+            args.inputChanged({ direction: keyPressed });
+    };
+
+    (function () {
+        document.addEventListener("keydown", keyDown);
+        document.addEventListener("keyup", keyUp);
+    })();
+};
+```
+
+Using `xor` operator flags are being cleared as soon as keys are released. This way multiple keys are handled and all that I've done is - added one variable and one more event handler. Easy as pie.

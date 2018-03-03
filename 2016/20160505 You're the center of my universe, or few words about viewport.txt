@@ -1,0 +1,56 @@
+The arena is big. Bigger than the screen. Well, at this point arena is infinitely big, but that's gonna change at some point. It will be big though. You wanna know what is the problem with big arena? Player can get lost. More. Player can get out of screen. Try to aim when you can't see your rifle! This is about to change.
+
+Fortunately I already have viewport in place. Until now it served one purpose only - to flip around the Y axis and move the screen down so that player is visible, up is up and down is down. But in my mind I had already an idea of how it was supposed to work with scrolling visible game area so that player can see his or her representation at all times. The target is simple: I want player to always be in the center of the screen. It kind-of gives the impression that player does not move but rather all the world around him or her is being moved. And that's fine - this way player is never lost, it is easy to rotate the player, mouse will always be rotated around center of the screen. The implementation is simple as well.
+
+```javascript
+var processFrame = function (timestamp) {
+	...
+	
+	var currentPlayer = getCurrentPlayer();
+	if (currentPlayer !== undefined) {
+		viewport.x = canvas.width / 2 - currentPlayer.Position.X;
+		viewport.y = -canvas.height / 2 - currentPlayer.Position.Y;
+	}
+	
+	...
+}
+```
+
+Before each frame is being processed, I calculate new viewport size. In case of X axis it is straightforward - since I want player to be in the middle of the screen, I calculate how far of the screen center the player is (screen center being half the width of canvas; if I subtract player position from it I will get how many units I need to move my screen to get player centered).
+
+For Y axis things are tiny bit different. Remember that Y axis is flipped (since Y in geometry goes up the higher we get, but on screen Y gets larger when we go down the screen), so I need to flip canvas height as well to get the correct number of units to correct my screen position.
+
+Now it is time for graphics rendering:
+
+```javascript
+function drawBullet(bullet) {
+	drawingContext.beginPath();
+
+	drawingContext.fillStyle = "rgba(0, 0, 0, 1)";
+	x = bullet.Position.X + args.viewport().x;
+	y = bullet.Position.Y + args.viewport().y;
+
+	drawingContext.arc(x, -y, bullet.Size, 0, 2 * Math.PI);
+	drawingContext.fill();
+	drawingContext.closePath();
+}
+```
+
+This is bullet drawing, but the same actions were completed in player rendering, skipped here for brevity. Since I have viewport which tells how far of the screen center player is, I need to add this value to all positions on the screen to translate those objects into correct position regarding to viewport. This is simple - just add viewport to position vector. Notice that y variable is still being flipped when being drawn - viewport does not change that, it only gets transition calculated in flipped units, but then the actual drawn point needs to still be flipped.
+
+Is that all? No - there is one more place where viewport is being used. User input handling - where I calculate player mouse position in game arena coordinates:
+
+```javascript
+function mouseMove(e) {
+	var targetRect = document.getElementById("arena").children[0].getBoundingClientRect();
+	mouseCoordinates = { x: e.clientX - targetRect.left, y: e.clientY - targetRect.top };
+	mouseCoordinates.x = mouseCoordinates.x - args.viewport().x;
+	mouseCoordinates.y = -mouseCoordinates.y - args.viewport().y;
+
+	notifyKeysChanged();
+}
+```
+
+Two things here. First - y axis mouse coordinates stay flipped, like when drawing. And second - here I do not add viewport but subtract it. This is simple - Since I've added it to move the world to screen coordinates, I need to reverse the operation to move screen coordinates into world coordinates.
+
+And with those few simple changes player is now in the center of game and everything moves relative to him or her. And every player is certain he is the center of the universe. This proves Einstein's theory that everything is relative nicely ;)

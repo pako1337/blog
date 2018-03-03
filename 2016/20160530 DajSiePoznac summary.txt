@@ -1,0 +1,14 @@
+With May coming to an end, it is time to summarize DajSiePoznac competition.
+
+First, few numbers:
+
+Views: 1156  
+Visitors: 891  
+Posts: 36  
+Commits: 138
+
+Thanks everyone for visiting!
+
+Second, project progress. It has been good. I've done a lot, more than I thought I will manage, between work, private life and everything. 36 posts, 138 commits. And With those commits came some code. Moving objects around, drawing stuff in javascript, calculating collisions in couple of ways, reacting precisely to those collisions. And synchronising everything between multiple players on simple html web page with SignalR. Not exactly ground breaking, but gave me a lot of fun and helped me produce working prototype that will be further extended.
+
+With all of that, I hope I did well. Cheers!

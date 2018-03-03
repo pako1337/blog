@@ -1,0 +1,53 @@
+Time to connect client to server. After all it is supposed to be interactive game with many clients. SignalR seems to be interesting library that should be able to do what I need.
+
+SignalR is from Microsoft, integrates with ASP.NET easily, but can also be used in other technologies. Cool stuff, I tell you. If you will look at the setup in docs, there are few steps only. First of those - install ASP.NET SignalR. Few minutes (seconds if you're lucky) and we have it.
+
+Second - in `Startup` map SignalR.
+
+```csharp
+public void Configuration(IAppBuilder builder)
+{
+	...
+	builder.MapSignalR();
+}
+```
+
+Bootstrapper needs to be created to configure Nancy so it servers javascript files as static content.
+
+```csharp
+public class Bootstrapper : DefaultNancyBootstrapper
+{
+	protected override void ConfigureConventions(NancyConventions nancyConventions)
+	{
+		base.ConfigureConventions(nancyConventions);
+		nancyConventions.StaticContentsConventions.AddDirectory("Scripts");
+	}
+}
+```
+
+And a little modification for `index.html`
+
+```html
+<script type="text/javascript" src="../Scripts/jquery-2.2.1.min.js"></script>
+<script type="text/javascript" src="../Scripts/jquery.signalR-2.2.0.min.js"></script>
+<script type="text/javascript" src="../signalr/hubs"></script>
+```
+
+All very simple. We need jQuery (updated to latest version, SignalR by default uses 1.6 at the moment). We need SignalR. Third script calls to server to hubs. There is no script for that in my code - that's internally handled by SignalR.
+
+I pressed F5 to see if all is OK. And to my surprise i got 404 for the last script. Well, alright, I must've made some mistakes along the way. Checked once and twice. Found nothing worth fixing. So it must be something else - SignalR mapping must be broken. For some reason system does not recognize `/signalr/hubs` path.
+
+Since I'm using Nancy, I guessed that it is probably something with it and SignalR not working very well. Well - the latter is MS product, built using MS stack and it works there from the get go.
+
+
+Quick search on google and I found [link](https://github.com/biofractal/Nancy-SignalR-Canonical-Chat "Nancy-SignalR-Canonical-Chat") app doing what I wanted - real time communication client to server with SignalR. Without going deep into code (it is simple and short though) I could notice some differences. First - there is no `UseNancy` registration in `Startup`, but it is replaced with `web.config` setup:
+
+```xml
+<httpHandlers>
+  <add verb="*" type="Nancy.Hosting.Aspnet.NancyHttpRequestHandler" path="*" />
+</httpHandlers>
+```
+
+OK, interesting. Tried that in my app, not expecting much. To my surprise - app started failing, saying it cannot find `Nancy.Hosting.Aspnet.NancyHttpRequestHandler`. Looking at the project references I knew there most be something missing. In fact - I found one difference. Default Nancy instalation uses `Nancy.Owin` assembly reference, however SignalR sample uses `Nancy.Hosting.Aspnet`. So next thing to try was - remove former, install latter. At this point `Startup` failed to compile due to missing `UseNancy`. But since it is configured in configuration file - there is no need for it.
+
+F5 again. And all is perfect. All javascript loaded, `signalr/hubs` also loads without any errors. Perfect! Next time connecting to server and making sure all is in place.

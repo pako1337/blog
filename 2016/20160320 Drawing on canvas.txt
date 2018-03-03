@@ -1,0 +1,55 @@
+Sure would be nice to see some players on the screen, not just players' list right? In a spirit of doing everything myself (which will cause me a lot of pain later on, I'm sure, but I'll let future me worry about it) I won't get any graphics engine to help me with this task. Well, nothing more than plain HTML canvas has to offer.
+
+First, it is time to encapsulate players' list inside game object. I don't want to handle all the logic inside my hub after all.
+
+```javascript
+function Arena(args) {
+    args = args || {};
+    var players;
+    var arenaHandler = args.arena || "arena";
+    var arena = document.getElementById(arenaHandler);
+
+    (function init() {
+        players = args.playersList || new PlayersList(args.playersListOptions);
+    })();
+
+    var addNewPlayer = function (who) {
+        players.addNewPlayer(who);
+    }
+
+    return {
+        addNewPlayer: addNewPlayer,
+    };
+};
+```
+
+Ok, that was more work then benefit for now, just another layer of abstraction. But it will serve its purpose. Here I hope to have all the logic behind how the game works, at least at top level. It has handle for `arena` game display element. But I won't be painting on a div directly, since HTML provides useful `canvas` with some helpful functions.
+
+```javascript
+(function init() {
+	players = args.playersList || new PlayersList(args.playersListOptions);
+	var canvas = document.createElement("canvas");
+	arena.appendChild(canvas);
+
+	drawingContext = canvas.getContext("2d");
+})();
+```
+
+Simple for now - create canvas, append it to game arena and get drawing context. This context is what HTML offers to help us draw lines, arcs, dots etc. All the basics. Visual studio even offers great intelisense for that feature, very helpful along the way if you are new to it.
+
+Since I have where to draw, I need something to draw. Best would be to start with player's position indicator on the game board. On server side `Player` object is created and added when registering to the game. It holds `Position` structure, with `X` and `Y`, as well as `Size`, which is plain integer for now. What can be drawn with that information? Square maybe? Yea, squares are fine, but I think I will go for something more curved. Like a circle. Since the player's object is returned to all players, it can be used to draw the position on the arena in response to register event.
+
+```javascript
+var addNewPlayer = function (who) {
+	players.addNewPlayer(who);
+	drawingContext.strokeStyle = "#F00";
+	drawingContext.fillStyle = "#F00";
+	drawingContext.arc(who.Position.X, who.Position.Y, who.Size, 0, 2 * Math.PI);
+	drawingContext.stroke();
+	drawingContext.fill();
+}
+```
+
+Once player is added to the list of players, drawing context picks color for strike (border) and filling, then using `arc` function given by HTML canvas circle is being drawn. First two parameters are circle's center, then the radius, after that comes starting angle and ending angle. Angles are given in [radians](https://en.wikipedia.org/wiki/Radian "radians"); hence the closing angle is calculated to 2*Pi. After that all that is left is to draw the stroke and fill the content.
+
+Voilà - player has his representation on game area!

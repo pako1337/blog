@@ -1,0 +1,61 @@
+I'm currently working on some side project where I decided to use some other technologies than the standard set from work. I've chosen to have some fun with NHibernate (to have some comparision to Entity Framework) and PostgreSql (instead of one of SQL Server's edition). With NH I'm using fluent approach given by Fluent NHibernate with Automappings.
+
+With that kind of environment set up I started by defining some entities and configuring everything almost the standard way (some mapping overrides were required, but nothing special here, also some conventions were created to make everything generate appropriate mappings, nothing fancy). I've created sample database, checked that mappings generate correctly and set up some sample MVC3 application to show data to user on screen. And then the exception happened:
+
+> Column list0_.listid does not exist
+
+And in fact, it is not present, since on database there is column ListId, with pascal case notation, and the same goes for the property in List entity. So why the query uses different name than the property name? PostgreSql by default creates all columns as case insensitive (by not wrapping them with quotes). Seems that by default NHibernate's PostgreSql dll assumes the same behaviour and automatically converts all names to lower case. I however like having my columns case sensitive and thus named them "ListId" instead of listid.
+
+Ok, so we know why the error occurs, by how to fix it? Quick googling around let me to <a title="Fluent-NHibernate, PostgreSQL and Identifiers" href="http://manfredlange.blogspot.com/2011/04/fluent-nhibernate-postgresql-and.html" target="_blank">this blog post</a> where the solution is explained deeply. In short, I just needed to override naming strategy for NHibernate so that all identifiers are now wrapped with double quotes and made case sensitive this way. Simple solution for simple problem. Then just use newly created naming strategy in session factory configuration and we're good to go.
+
+```csharp
+public class PostgreSqlNamingStrategy : INamingStrategy
+{
+    public string ClassToTableName(string className)
+    {
+        return DoubleQuote(className);
+    }
+    public string PropertyToColumnName(string propertyName)
+    {
+        return DoubleQuote(propertyName);
+    }
+    public string TableName(string tableName)
+    {
+        return DoubleQuote(tableName);
+    }
+    public string ColumnName(string columnName)
+    {
+        return DoubleQuote(columnName);
+    }
+    public string PropertyToTableName(string className,
+                                      string propertyName)
+    {
+        return DoubleQuote(propertyName);
+    }
+    public string LogicalColumnName(string columnName,
+                                    string propertyName)
+    {
+        return String.IsNullOrWhiteSpace(columnName) ?
+            DoubleQuote(propertyName) :
+            DoubleQuote(columnName);
+    }
+    private static string DoubleQuote(string raw)
+    {
+        // In some cases the identifier is single-quoted.
+        // We simply remove the single quotes:
+        raw = raw.Replace("`", "");
+        return String.Format("\"{0}\"", raw);
+    }
+}
+
+
+And the strategy is used this way:
+
+```csharp
+var rawConfig = new NHibernate.Cfg.Configuration();
+rawConfig.SetNamingStrategy(new OrmConfiguration.PostgreSqlNamingStrategy());
+var sessionFactory = Fluently.Configure(rawConfig)
+...
+```
+
+Simple, isn't it? Now it queries correctly, getting all the data I requested and using the columns I would like it to use. Great!

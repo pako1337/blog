@@ -1,0 +1,49 @@
+If anyone tried my code for collision detection, he or she might have noticed that it sometimes behaves unexpectedly. For example object seems to go inside the colliding object, just to be ejected in next frame or two. Quickly, but slowly enough to be noticable glitch, and in case of corners to cause object to skip to the other side. Not good!
+
+Turns out there are two problems. First - When messing around with border of my game arena, I defined for walls. But I did that incorrectly. My algorith depends on polygons to have points defined in clockwise manner. So for example first lower left corner, then upper left, upper right, and finally lower right. When done differently it messes things up for some sides of polygon as the normal axis does not point outside of the polygon - which is needed for collisions to be resolved correctly, moving player outside of polygon.
+
+Second error was more hidden. Took me almost two hours to figure out what is going on. Since player was just going a little bit inside the object and then was correctly resolved (to the correct side of obstacle), I thought that collision code must be OK, and maybe somehow I'm skipping collision detection, or maybe two frames are rendered at the same time, applying double movement to the object, temporarily putting it inside obstacle?
+
+Turns out issue was way simpler. I've messed up something that every developer on earth should know by the time he or she writes first application in highshool. And definitely before taking first money for their code. Double comparison. When comparing doubles you can never skip epsilon. If you do, you gonna find yourself figuring out why sometime, for some sides of polygon, collision detection does not work. Or why you suddenly get infinity printed out on the screen during client demo. Been there, done that. This year. Yea, I suck.
+
+Check this code:
+
+```csharp
+var intersectionRange = obstacleProjection.Intersect(objectProjection);
+intersectionRange = intersectionRange.Add(axisVector.Item2);
+
+if (intersectionRange.Length < 0.0001)
+	return null;
+
+if (intersectionRange.Length < smallestDisplacement.Item2.Length || // new collision is smaller
+	(Math.Abs(intersectionRange.Length - smallestDisplacement.Item2.Length) < 0.0001 && // or collision sizes are the same
+	 Math.Abs(intersectionRange.Start) < Math.Abs(smallestDisplacement.Item2.Start)))    // but collision is closer to polygon side
+{
+	smallestDisplacement = Tuple.Create(axisVector.Item1, intersectionRange);
+}
+```
+
+It does exactly what is needed, right? If new collision is smaller, it needs to be picked as smallest displacement. If not, we check additional stuff. Worked *perfectly* for the single test polygon I used for my testing. I even picked one that is not aligned with X and Y axes to make sure everything works exactly as it should!
+
+So what is the problem? Sometimes, when conditions are just right, doubles get a little bit unprecise. And then all hell breaks loose. Imagine if two axes are parallel, like in rectangle top and bottom sides, collision displacement counting from 0 axis would be exactly the same, just axis will be different (one pointing down, for bottom axis, and other pointing up, for top axis). So when collision happens form the bottom and bottom side was checked first, it puts smalles displacement. And I go to check other sides, including top one. Displacement is the same there, just for different axis. And if it would be the same - all would be fine. But if double missies precision in calculations and return slightly lower value (say, 2.5118300001 versus 2.5118299991) algorithm decides that it has found new smallest collision side!
+
+Fix is simple, add epsilon value:
+
+```csharp
+var intersectionRange = obstacleProjection.Intersect(objectProjection);
+intersectionRange = intersectionRange.Add(axisVector.Item2);
+
+if (intersectionRange.Length < 0.0001)
+	return null;
+
+if (intersectionRange.Length < smallestDisplacement.Item2.Length - 0.0001 || // new collision is smaller
+	(Math.Abs(intersectionRange.Length - smallestDisplacement.Item2.Length) < 0.0001 && // or collision sizes are the same
+	 Math.Abs(intersectionRange.Start) < Math.Abs(smallestDisplacement.Item2.Start)))    // but collision is closer to polygon side
+{
+	smallestDisplacement = Tuple.Create(axisVector.Item1, intersectionRange);
+}
+```
+
+Even if there is double error in calculations, small epsilon will make sure that it will not get interpreted as smaller collision size. And what if it actually is better collision? Second part takes care of it, checking if collision is roughly the same size (again, using epsilon) and it is closer to the side.
+
+Uff, problem solved! Never again doing this error. Or, well, hopefully not this month.

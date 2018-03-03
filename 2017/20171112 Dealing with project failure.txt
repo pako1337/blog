@@ -1,0 +1,27 @@
+Sometimes our projects fail. How we, as a team, and our managers and leaders deal with it is very, very important. We can learn from what happened, we can try to figure out what went wrong, what needs to be improved in future projects. It also decides how team will feel and how they will approach future endeavours.
+
+This post is inspired by story of one of my fellow devs. They recently finished a short project for a client. When they were starting few weeks ago, no one was willing to work on this project as everyone thought deadlines are impossible to meet. Requirements were complex, team was not too familiar with the domain etc. And here comes manager, not technical guy, spending his time convincing the team that this is easy, doable, they can achieve it. Complex requirements are not that complicated and everything can be simplified. In the end, one dev said that yea, he can do it. He started working on the project.
+
+Soon, of course, developer realised that this is at least as complex as everyon initially thought, starting putting in more and more hours into project, working 12 hours a day. Others on the team started staying long hours to help collegue.
+
+When final date was close, manager came in, said that everything is cool and they can leave at 4pm, not to worry about anything. And some of the team did. Others decided to stay late and finish up the project.
+
+On Monday there was demo for client. Demo apparently went well, client was happy, however product was mostly smoke and mirros, not fully implemted. It happens, right? Underestimated complexity, short deadline, team with not deep enough knowledge and no domain expert available. But - they pushed, they delivered something so it is not all down the drain. Or so I thought listening to the story.
+
+Next day, manager came in, shouting at everyone, taking away bonuses from people that left on time on Friday (that is, after 8 hours of work). He blamed the whole team for the failure, not taking the blame on himself. This is ugly, I think. Team initially did not want to commit to the project as they thought it was not feasible to deliver it in given time frame. Team warned manager. And they only started work after manager worked hard to convince them that they are wrong and project is easy. Team did not deserve this kind of treatment after finished project, despite its potential failure (client was happy, I remind you, even if not over the moon - at least content). Taking away bonuses, screaming at people only because they left on time, exactly like manager told them too. And not taking into account that they spent a lot of time working overtime trying to deliver the project - that's ugly, ugly managing of people. Definite red flag if you ask me.
+
+But that was not the end. What came next strikes me as pure sociopathy. Manager told the team, that they need to pick one person who's most responsible for project's problems and this person will get fired. Yea, you got that right. Team has to pick someone who will loose their job. Like it's some kind of big brother or shit.
+
+Isn't it crazy? I mean - isn't that, at the very least, manager's job to manage people and decide who to fire (although in given situation I don't think anyone, except for maybe manager, deserves to get the boot)? How toxic is the situation with the team now is hard for me to imagine. What will happen when next project will have problems (which eventually will happen). Who will get fired then? Should I bring pizza for everyone next Friday so they will feel bad if I make any mistake and will not fire me?
+
+This manager decided that people on the team are his resources. Cows, giving milk. And if one cow seems to not give enough milk this week, not only will he turn this cow into hamburgers, but he will make other cows look.
+
+This is not how managing people works. This is not how anything should work, not in development teams, not in any other kind of work. Seems like this, so called, manager is not only completely untrained to do his job, he is also basically evil and unfit for any kind of people-contact position.
+
+What he thought he was, is the king, allmighty.
+
+20171112_bagManager.png
+
+What he should have thought about himself is being a good leader, showing the way and solving problems, not creating ones.
+
+20171112_goodLeader.png

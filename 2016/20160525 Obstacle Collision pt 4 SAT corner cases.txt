@@ -1,0 +1,53 @@
+[Last](https://jporwol.wordpress.com/2016/05/20/obstacle-collisions-pt-3-sat-implementation/ "Obstacle Collision pt. 3, SAT implementation") part finished with Separate Axis Theorem implemented for collisions between polygon and circle, with one exception left: when circle is next to one of the corners of polygon, it may produce false collisions.
+
+False collisions.png
+
+To fix this there is only one way - check more axes. After all there has to be one that gives some distance between objects' projections, if theory is correct. I've checked all reasonable axes form polygon object, but none of the potential axes of the circle. Problem is - circles, being as cools as they are, have infinite corners, so checking every axis based on "sides" of circle, so to say, is time consuming. But - we can get more clever than that! The circle is not colliding with polygon if there is space between circle and polygon sides (that was checked by polygon axes) and if every corner of polygon is outside of circle. Hmm, how about I check every corner's position? That would do, but that wouldn't be SAT to be precise. But What if I checked every axis build between circle's center point and polygon corner? Well, there would certainly have to be some space if there is no collision!
+
+circle to corner collision.png
+
+What about the code? The difference is impressively small!
+
+```csharp
+private bool ObstacleCollide(Obstacle obstacle, IGameObject gameObject)
+{
+	var prevPoint = obstacle.Points[0];
+
+	foreach (var axisVector in GetAxisVectors(obstacle, gameObject))
+	{
+		var obstacleProjection = ProjectOntoAxis(axisVector, obstacle);
+		var objectProjection = ProjectOntoAxis(axisVector, gameObject);
+
+		var intersectionRange = obstacleProjection.Intersect(objectProjection);
+
+		if (intersectionRange.Length < 0.0001)
+			return false;
+	}
+
+	return true;
+}
+
+private IEnumerable<Vector2d> GetAxisVectors(Obstacle obstacle, IGameObject gameObject)
+{
+	var prevPoint = obstacle.Points[0];
+
+	for (int i = 1; i < obstacle.Points.Length; i++)
+	{
+		var currentPoint = obstacle.Points[i];
+		var sideVector = currentPoint.Subtract(prevPoint);
+		yield return sideVector.Unit().Normal();
+	}
+
+	for (int i = 0; i < obstacle.Points.Length; i++)
+	{
+		var circleToPointVector = gameObject.Position.Subtract(obstacle.Points[i]);
+		yield return circleToPointVector.Unit();
+	}
+}
+```
+
+So what I did is moved the axes extraction to separate method. In main method I can now just iterate over all possible axes that are returned from specialized piece of code that knows exactly what axes I have to check. In this method I first return all the usual cases for polygon sides, and later on, if all polygon axes reported collision, I build axes between every corner of polygon and circle center. Notice that there is no normalisation step involved in here - axis produced this way is already oriented correctly and will be perpendicular to posisbly separating line between two objects, like I want.
+
+One possible optimisation here would be to just check one corner - the closes one to the circle. If this corner reports no collision - we're good to go. If it reports collision, it must be because it lies inside the circle so the collision is definite and there is no point in checking other corners.
+
+So there it is. SAT implemented. But system does not react to obstacle collisions at all. I will know what to do about this by the time I write next post, I hope!

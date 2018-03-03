@@ -1,0 +1,123 @@
+In [previous](https://jporwol.wordpress.com/2016/05/19/obstacle-collisions-pt-2-separating-axis-theorem/ "Obstacle collisions pt 2 Separating axis theorem") I've introduced the idea of separating axis theorem and how it is useful to find out if two objects collide. Today I will show the code, the interesting bits. You will be surprised how easy and neat it looks!
+
+First high level - go through all obstacles and check with which my game object collides.
+
+```csharp
+private void CalculateCollisions(IGameObject o1)
+{
+	foreach (var obstacle in Obstacles)
+	{
+		if (ObstacleCollide(obstacle, o1))
+		{
+			// handle collision
+		}
+	}
+}
+```
+
+Then, for each object, check every possible side of obstacle and see if there is an intersection between obstacle projection onto normal axis for this side, and game object projection to onto tis axis. As you can see, my object representation is list of points, not sides, so I have to build side vector. Obvious optimization would be to just hold objects's sides, not points, but points are good for now. Also see, that if there is any axis found where there is no intersection (common range of projections is less than small number I picked; remember those are doubles and hence may not always get precise values in decimal system we are used to so never compare two doubles by simple `==` if you want to avoid bugs) I escape collision checking at once - since there is an axis that objects do not have overlapping projections there is no collision happening for sure and I can save few microseconds by not checking remaining sides.
+
+```csharp
+private bool ObstacleCollide(Obstacle obstacle, IGameObject gameObject)
+{
+	var prevPoint = obstacle.Points[0];
+
+	for (int i = 1; i < obstacle.Points.Length; i++)
+	{
+		var currentPoint = obstacle.Points[i];
+		var sideVector = currentPoint.Subtract(prevPoint);
+		var axisVector = sideVector.Unit().Normal();
+
+		var obstacleProjection = ProjectOntoAxis(axisVector, obstacle);
+		var objectProjection = ProjectOntoAxis(axisVector, gameObject);
+
+		var intersectionRange = obstacleProjection.Intersect(objectProjection);
+
+		if (intersectionRange.Length < 0.0001)
+			return false;
+	}
+
+	return true;
+}
+```
+
+All operations above should be pretty self explanatory, except maybe for building normal vector (call to `Normal()` method in line 9). Normal vector is vector that is at 90 degrees to current vector. In 2D there are of course two such vectors (if original vector goes straight up, normal vectors would be one pointing to left and one pointing to right). How is this vector obtained? Extremely simple - it is just a vector with swapped `X` and `Y` coordinate, and one of those coordinates multiplied by `-1` (which one will be multiplied determines if it will be *left* or *right* normal vector). Imagine vector [0, 1]. If you will swap coordinates, you will get [1, 0]. If you will multiply X by -1, you will get *left* normal vector [-1, 0]; if you will multiply Y you will get *right* normal vector [1, 0] (the same as vector just after swap, but that's just because it is 0 coordinate, usually that won't be the case).
+
+```csharp
+public Vector2d Normal()
+{
+	return new Vector2d(Y, -X);
+}
+```
+
+For SAT calculations, does it matter which one we will pick? For the moment - no. The difference will be - will the normal vector point inside or outside of the object. But that does not matter for collision verification, instead of positive numbers on axis I may get negative ones, but is still valid math, thank you very much :)
+
+OK, next thing on the list is doing projections of object onto given axis. Visually - easy. Mathematically? Well... easy-if-not-easier! From high school math, vectors, remember dot product operation? For vectors `A[X, Y]` and `B[X, Y]`, dot product is defined as `AX * BX + AY * BY`. How does that help? Turns out (thanks to some clever math) that this scalar value is equal to length of vector `B` projected onto vector `A`. Yea, that's what I need. Since I have my object hold all points as vectors (which could be interpreted as vector from 0,0 coordinate to object's vertex) I can project it onto axis vector and get distance from beginning of the axis. If done for all points in object, and recorded minimum and maximum value, the result would be set of two numbers that define from where to where objects projection goes.
+
+```csharp
+private Range ProjectOntoAxis(Vector2d axisVector, Obstacle obstacle)
+{
+	double min = double.MaxValue;
+	double max = double.MinValue;
+
+	for (int i = 0; i < obstacle.Points.Length; i++)
+	{
+		var currentPoint = obstacle.Points[i];
+
+		var projectionSize = axisVector.DotProduct(currentPoint);
+		if (projectionSize < min)
+			min = projectionSize;
+		if (projectionSize > max)
+			max = projectionSize;
+	}
+
+	return new Range(min, max);
+}
+```
+
+Why do I return numbers as `Range`s? To encapsulate some operations inside of it. Remember the line that calculates intersection of two ranges from two objects? It is neatly hidden behind `Range` abstraction.
+
+
+```csharp
+public class Range
+{
+	public double Start { get; set; }
+	public double End { get; set; }
+	public double Length { get { return End - Start; } }
+
+	public Range(double a, double b)
+	{
+		Start = a < b ? a : b;
+		End = a < b ? b : a;
+	}
+
+	public Range Intersect(Range other)
+	{
+		var firstRange = Start < other.Start ? this : other;
+		var secondRange = firstRange == this ? other : this;
+
+		if (firstRange.End < secondRange.Start)
+			return new Range(0, 0);
+
+		return new Range(secondRange.Start, firstRange.End);
+	}
+}
+```
+
+Intersection is simply calculated by taking minimum value of range further to left on axis, and maximum value is end of range closer to the right end of axis. Unless of course those ranges are separated, in which case empty range is returned. Don't believe me? Draw it on a piece of paper and you will see that it works.
+
+And that's it, right? We have projections, intersections, all done using very basic math on vectors. Collisions should be detected perfectly, right? Well, not so fast. One of the object is convex polygon, true, but the other is circle. Since iterating over all vertices of circle would take a while (like an infinite while), there must be a better way right?
+
+Fortunately circles are extremely nice creatures and pure joy to work with. They always have the same size in any way you look at them (2 * cirle radius). So calculating projections will also be simple. If I was only interested in size it would just be one multiplication. But I need to have circle's position in normal axis as well. The only point in circle that I know where is, is circle's origin point, right there in the middle. Projecting it onto axis (again, dot product) gives center projection. From there add and subtract size once and there it is, projection done like a champ.
+
+```csharp
+private Range ProjectOntoAxis(Vector2d axisVector, IGameObject gameObject)
+{
+	var centerProjection = axisVector.DotProduct(gameObject.Position);
+	return new Range(centerProjection - gameObject.Size, centerProjection + gameObject.Size);
+}
+```
+
+And you know what? That's it! it will find collisions, it will work... except it won't. In some cases it will find collisions that aren't there. When? If circle is placed next to the corner of the rectangle, all projections from rectangle sides will show collision, but there is clearly a separation! Let's work on that in next part.
+
+False collision.png

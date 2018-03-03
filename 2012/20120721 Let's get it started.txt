@@ -1,0 +1,5 @@
+It's time to finally start blogging. Hope this will help me organize things in my mind and put some of ideas and/or solutions into the web for future me and possibly for you, dear reader.
+
+First let me introduce myself. I'm Jarek, software developer from Poland. I'm currently coding for last three years (as an employee), but I've been having some serious fun with code for past 10 years or so. I'm using mostly Microsoft's technologies on .NET platform, like C#, VB.NET (unfortunately), Visual Studio and so on. Apart from that I like reading good (not necessarily software-related) book, watching good movie or tv show. And who doesn't.
+
+Yeah, that's more than enough, let's get it started with some more serious stuff soon.

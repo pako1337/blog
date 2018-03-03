@@ -1,0 +1,62 @@
+There is a need to differentiate between collision types. There should be different behaviour when player collides with bullet and different if two players collide with each other. That is unless we assume players have bayonettes, which I don't. With bullets it is pretty straightforward - bullet and player are eliminated from game. But what when two players meet? The idea itself is simple, players need to be moved back a little bit, just enough for them to no longer collide. But player's move cannot be completly canceled - that would possibly take him too far out, leaving space between players and not making great user experience. Who likes invisible walls, right?
+
+Fortunately the solution is not too complex. Again - circles make it so easy. We do have two circles that are colliding. This means that there is ceratin part of both circles that overlaps. What needs to be done is - I need to have distance at which the circles overlap and vector at pointing back from the collision direction to indicate how far player that caused collision needs to be moved back. And it is very similar to what I was doing in collisions already - I calculate distance between two objects using vector pointing from center of one object to center of the other. I also have distance between those objects - this is just a sum of ther radii. But how do I get vector pointing out of collision?
+
+If I have distance between players and sizes of them - the difference between two values (distance - sum of radii) will be distance at which objects collide. Since I also have distance vector, all I need to do is to take unit vector of distance and scale it to the size of collision distance. But will the direction of vector be right? Sure it will. At first the vector is calculated to point from source object (say player A) to target object (player B that is). And since distance between players is smaller then sum of radii (that's the only case in which collision is detected), subtracting those numbers will give negative value. Scale distance unit vector by this and in return you will get nice pointy vector pushing player out of player's B personal space. Well, this explanation got long, but the idea presented in code is ultra simple. Just look:
+
+```csharp
+private void HandleCollision(Player o1, Player o2)
+{
+	var distanceVector = new Vector2d(o2.Position.X - o1.Position.X, o2.Position.Y - o1.Position.Y);
+	var distance = distanceVector.Length();
+	var collisionLength = distance - (o1.Size + o2.Size);
+
+	var collisionFixVector = distanceVector.Unit().Scale(collisionLength);
+
+	o1.Position = o1.Position.Add(collisionFixVector);
+}
+```
+
+And just one small piece - to figure out which collision handling method to use, and it is done.
+
+```csharp
+private void CalculateCollisions(IGameObject o1)
+{
+	foreach (var o2 in GameObjects)
+	{
+		if (o1 == o2) continue;
+		if (ObjectsCollide(o1, o2))
+		{
+			HandleCollision(o1, o2);
+		}
+	}
+}
+
+private bool ObjectsCollide(IGameObject o1, IGameObject o2)
+{
+	var distanceVector = new Vector2d(o2.Position.X - o1.Position.X, o2.Position.Y - o1.Position.Y);
+	return distanceVector.Length() < o1.Size + o2.Size;
+}
+
+private void HandleCollision(IGameObject o1, IGameObject o2)
+{
+	if (o1 is Player && o2 is Bullet)
+		HandleCollision(o1 as Player, o2 as Bullet);
+	else if (o1 is Bullet && o2 is Player)
+		HandleCollision(o2 as Player, o1 as Bullet);
+	else if (o1 is Player && o2 is Player)
+		HandleCollision(o1 as Player, o2 as Player);
+}
+
+private void HandleCollision(Player o1, Bullet o2)
+{ ... }
+
+private void HandleCollision(Player o1, Player o2)
+{ ... }
+```
+
+Very simple, maybe will replace it with something smarter later on, but now it works like a charm.
+
+Also note that I changed collision detection to take object as parameter. That is to change when collisions are calculated - now they are done immediately after the object moves. This is so that I can tell which object to move back - obviously this needs to be the one that caused collision by moving.
+
+And that's it - players won't disappear after touching no more, but rather will slide around each other.

@@ -1,0 +1,40 @@
+There is one thing that makes performance optimization much more pleasant experience - profiler. Without one you will be guessing where's your bottleneck. And there is good chance you will be wrong. So start up something nice, I've decided to use free trial version of dotTrace Performance by JetBrains available here: http://www.jetbrains.com/profiler/.
+
+I didn't try anything fancy yet - just let profiler start application by itself and check its performance. I've picked simple Sampling option as it has little overhead and should still give good idea about general bottlenecks in application. And it sure did.
+
+Looking at plain list it is obvious that `Triangle.GetSegments()` method is slowest part of my code. I'm looking at Own time column to see how much time I've spent in this method alone, not counting children method calls. Well - of course it is slow. I'm returning new instance of list at least few times for each collision, see usage in `SegmentsAreCrossing` and `Contains` methods. That's pretty lame. Triangle won't change, so segments won't change. Why keep recreating them when we can get them done once and reuse throughout Triangle's life? Let's do that.
+
+I've added new private field called `_lines` and filled it in constructor of triangle and then adjusted methods to use this field instead of `GetSegments` method call.
+
+```csharp
+        private Line[] _lines;
+                
+        public Triangle(Point a, Point b, Point c)
+        {
+            A = a;
+            B = b;
+            C = c;
+
+            _lines = new[]
+            {
+                new Line(A, B),
+                new Line(B, C),
+                new Line(C, A)
+            };
+        }
+		
+		...
+		
+		private bool SegmentsAreCrossing(Triangle b)
+        {
+            return _lines.Any(sa => b._lines.Any(sb => sa.Intersects(sb)));
+        }
+```
+		
+What might be surprising to some (at least was surprising to me once) is how we can access private field from another object. Take closer look at `SegmentsAreCrossing` method. Inside lambda expression we are just calling `b._lines` but clearly `b` is not part of this class, it is parameter passed to the method! How can this work? It's simple, really. Private fields are private not for object instance but for whole class. So as long as you are working with the same class (and that's the case since `b` is Triangle's class instance) you can access its private fields easily. Convenient and helps me here - less method calls must be better, right? How much better?
+
+Code still found `8058` collisions but now it took just `1061ms` for serial version and mere `308ms` for parallel code. Wow, simple, obvious change and its already 753 and 254 milliseconds faster respectively. Of course nothing is free. What cost am I paying here? Memory usage. Before that change, lists were only created when needed. Now list will live as long as long Triangle class instance will be held in memory. Is that bad? It depends, but in this case not really. We often need those lines, performance benefit is much greater than memory price. And we are lowering Garbage Collection pressure since we are avoiding many short term allocations that could quickly fill up GC's Generation 0 object space.
+
+Easy win that was! Maybe there is something more we can get that easily? Starting profiling session again shows that the code that actually does something is now the biggest problem. Methods like `Triangle.Contains` and `Line.Intersects` are using most of available computing power. And those are calculations, I don't think I want to touch them now.
+
+So what we will look at next? At something you should always start with, when trying to optimize some code. Are you using right algorithm to solve the problem? Are you using the best available data structures? I am pretty sure I'm not, so we will see next where it will take me.

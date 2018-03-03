@@ -1,0 +1,103 @@
+I don't know if shooting game could be that much fun without something to hide behind and catch a breath. I will put some obstacles onto the map. What I imagine them to do is first, block all player movement through the obstacle, block all incoming bullets that hit obstacle, and, in future, block player's view of the part of arena hidden behind obstacle.
+
+I will start ith easy part first. I need obstacles to be visible on the screen. Invisible walls never really suited me, I'm shy guy after all. First, I extended my Arena class to hold list of obstacles. What is obstacle? Well, basicaly a thingy with list of points that define obstacle shape. It works for now, mybe will have something more in future to prove even more useful. But we like list of points, right?
+
+```csharp
+public class Obstacle
+{
+	public Vector2d[] Points { get; set; }
+
+	public Obstacle()
+	{
+		Points = new Vector2d[4]
+		{
+			new Vector2d(50, 100),
+			new Vector2d(100, 75),
+			new Vector2d(50, 0),
+			new Vector2d(0, 25)
+		};
+	}
+}
+```
+
+Since there are four points in this sample obstacle, you know it is going to be quadrilateral (yay for fancy words!, I'm not native speaker as you probably could've guessed ;)). I can tell you even more - it is going to be rectangle at an angle (see what I did here?).
+
+And Arena looks pretty much the same but with a twist;
+
+```csharp
+public class Arena
+{
+	...
+	public List<Obstacle> Obstacles = new List<Obstacle>() { new Obstacle() };
+	...
+}
+```
+
+And this gets returned to the player once he signs into the game.
+
+```csharp
+// RaimHub
+public void Register(string name)
+{
+	name = HttpUtility.HtmlEncode(name);
+
+	var player = arena.RegisterPlayer(name);
+	players.Add(Context.ConnectionId, player);
+
+	Clients.Caller.SignedIn(player.Id);
+	Clients.Caller.SetupArena(arena);
+	Clients.All.Registered(player);
+	Clients.Caller.OtherPlayers(players.Values.Where(p => p.Name != name));
+}
+```
+
+On a client this arena object is available for graphics "engine" to a) draw arena border, and b) draw all the obstacles. See the code, it is pretty simple:
+
+```javascript
+var drawArena = function (gameObjects) {
+	drawingContext.clearRect(0, 0, canvas.width, canvas.height);
+
+	drawArenaBorders();
+	drawObstacles();
+
+	...
+};
+
+function drawArenaBorders() {
+	if (args.arena() == undefined) return;
+
+	drawRectangle([
+		{ X: 0, Y: 0 },
+		{ X: 0, Y: args.arena().ArenaSize.Y },
+		{ X: args.arena().ArenaSize.X, Y: args.arena().ArenaSize.Y },
+		{ X: args.arena().ArenaSize.X, Y: 0 }]);
+}
+
+function drawObstacles() {
+	if (args.arena() == undefined) return;
+
+	var obstacles = args.arena().Obstacles;
+	for (var i = 0; i < obstacles.length; i++) {
+		drawRectangle(obstacles[i].Points);
+	}
+}
+
+function drawRectangle(points) {
+	if (points.length < 2) return;
+
+	drawingContext.beginPath();
+
+	drawingContext.moveTo(points[0].X + args.viewport().x, -(points[0].Y + args.viewport().y));
+	for (var i = 1; i < points.length; i++) {
+		drawingContext.lineTo(points[i].X + args.viewport().x, -(points[i].Y + args.viewport().y));
+	}
+
+	drawingContext.lineTo(points[0].X + args.viewport().x, -(points[0].Y + args.viewport().y));
+
+	drawingContext.strokeStyle = "rgba(0, 0, 0, 1)";
+	drawingContext.stroke();
+	drawingContext.closePath();
+}
+```
+
+The same function draws borders and obstacles. All are rectangles, just one limits you from escaping and the other blocks you from going in. Well, sort-of. It will in future. I promise.

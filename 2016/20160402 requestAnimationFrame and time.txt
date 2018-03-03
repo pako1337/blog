@@ -1,0 +1,117 @@
+OK, to get my animation smooth, first I've extracted animation code to separate object.
+
+```javascript
+var raimGraphics = function (args) {
+    var canvas = args.canvas;
+    var objects = args.objects;
+    var drawingContext = canvas.getContext("2d");
+    
+    var drawArena = function () {
+        drawingContext.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (var i = 0; i < objects.count() ; i++) {
+            var gameObject = objects.get(i);
+
+            gameObject.Position.X += gameObject.Speed.X;
+            gameObject.Position.Y += gameObject.Speed.Y;
+
+            drawingContext.beginPath();
+            drawingContext.strokeStyle = "#F00";
+            drawingContext.fillStyle = "#F00";
+            drawingContext.arc(gameObject.Position.X, gameObject.Position.Y, gameObject.Size, 0, 2 * Math.PI);
+            drawingContext.stroke();
+            drawingContext.fill();
+            drawingContext.closePath();
+        }
+    };
+
+    return {
+        startRendering: drawArena,
+    };
+};
+```
+
+Drawing loop looks pretty much the same, just packed in different object. But now I can mess around having only few dependencies. What I want is to draw a frame of game state every few milliseconds. In 60Hz screens world, every 16ms seems to fit the bill. Javascript offers nice function `setTimeout` that will call provided function every x milliseconds and I could use it. But it has some disadvantages. First - it will try call drawing code every x milliseconds, no matter if game is displayed or not, browser can be minimized, system under load etc. And there are more important things to do than to draw frames just to align perfectly with 60fps.
+
+Since Chrome 10, Firefox 4 and Internet Explorer 10 there is another option: `requestAnimationFrame`. It is function provided by javascript that will call provided callback method whenever browser decides is the good time to draw a frame. If browser is busy - it may request frames less frequently. If user switched to another tab or minimized browser window altogether, frame rate can be dropped as well to save power, battery etc. Usage is extremely simple:
+
+```javascript
+function drawing() {
+	// drawing code here
+	requestAnimationFrame(drawing);
+}
+
+requestAnimationFrame(drawing);
+```
+
+Notice that once `drawing` is called, at the end it requests another animation frame. This way you can stop animation by simply not calling this function any more (say, if you detect user finished game or something).
+
+I've modified my code a little bit to make use of this.
+
+```javascript
+var raimGraphics = function (args) {
+    var canvas = args.canvas;
+    var objects = args.objects;
+    var drawingContext = canvas.getContext("2d");
+
+    var lastFrameTime;
+    
+    var drawArena = function (timestamp) {
+        if (!lastFrameTime)
+            lastFrameTime = timestamp;
+
+        drawingContext.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (var i = 0; i < objects.count() ; i++) {
+            var gameObject = objects.get(i);
+
+            gameObject.Position.X += gameObject.Speed.X;
+            gameObject.Position.Y += gameObject.Speed.Y;
+
+            // old drawing code
+        }
+
+        lastFrameTime = timestamp;
+        requestAnimationFrame(drawArena);
+    };
+
+    var startRendering = function () {
+        requestAnimationFrame(drawArena);
+    };
+
+    return {
+        startRendering: startRendering,
+    };
+};
+```
+
+You can see that there is timestamp parameter passed to callback function. It can be used to calculate time between frames and thus - animation progress. So I am saving last frame time at the end of animation and can use if when the next frame comes. Also, there is code that modifies position based on speed. Drawing loop may not be the best place to do this, but it is proof of concept at the moment.
+
+But what happens when the application starts is - game is drawn, I press key - animation starts and object is moving. But it is moving way to fast. I've set it to move 10 units, where each unit is one pixel on screen. 10 units per second I assumed - but it is moving way to fast on screen. D'oh - there are time frames set, but not used to calculate actual distance traveled.
+
+And then - once the buttons are released - player is re-set to original position in left top corner of the scren. Of course it happens because there was no communication from the server's calculated position change, only button update and it still thinks player is in original position. At least it proved that if someone tried cheating - server's code is more important and it will gladly reset player.
+
+OK, so final fix to use time variable in position modifying:
+
+```javascript
+var drawArena = function (timestamp) {
+	if (!lastFrameTime)
+		lastFrameTime = timestamp;
+
+	drawingContext.clearRect(0, 0, canvas.width, canvas.height);
+
+	var timeDiff = (timestamp - lastFrameTime) / 1000;
+
+	for (var i = 0; i < objects.count() ; i++) {
+		var gameObject = objects.get(i);
+
+		gameObject.Position.X += gameObject.Speed.X * timeDiff;
+		gameObject.Position.Y += gameObject.Speed.Y * timeDiff;
+
+		// old drawing code
+	}
+
+	lastFrameTime = timestamp;
+	requestAnimationFrame(drawArena);
+};
+```

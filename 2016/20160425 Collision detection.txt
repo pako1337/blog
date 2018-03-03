@@ -1,0 +1,34 @@
+What fun would be the game where you can shoot but can't hit anything? No fun at all. Therefore there has to be some mechanism to calculate collisions between objects in system.
+
+```csharp
+private void CalculateCollisions()
+{
+	foreach (var o1 in GameObjects)
+		foreach (var o2 in GameObjects)
+		{
+			if (o1 == o2) continue;
+			if (ObjectsCollide(o1, o2))
+			{
+				if (o1 is IDestroyable)
+					((IDestroyable)o1).IsDestroyed = true;
+
+				if (o2 is IDestroyable)
+					((IDestroyable)o2).IsDestroyed = true;
+			}
+		}
+}
+
+private bool ObjectsCollide(IGameObject o1, IGameObject o2)
+{
+	var distanceVector = new Vector2d(o2.Position.X - o1.Position.X, o2.Position.Y - o1.Position.Y);
+	return distanceVector.Length() < o1.Size + o2.Size;
+}
+```
+
+The code above is prety simple. Fortunately in my system all objects are round (what a genious design decision, right?), which makes collision detection extremly efficient and precise. What you do is - calculate distance between center points of both circles and compare them to sum of their radii (what a cool word, plural of radius, way cooller than radiuses). I don't think it can get any simpler than that.
+
+When I have collision, I do one thing - destroy each object that can be destroyed. For this I have marked player as destroyable as well - player would like to get some points after hitting other player, not just his or her bullets.
+
+There are bunch of problems with this solution though. First it is `O(n^2)`, I do iterate over objects twice to get my results. This also means I will detect collisions two times - after all if A collides with B - B will collide with A as well. I am also checking agains all objects all over the game arena, which may get quite big. That means a lot of collisions to check against, most of which seem ridiculous - what's the point of checking collision with player who's 200 units away from bullet.
+
+It has one benefit though - it works and it is like 20 lines of code, works as starting point.

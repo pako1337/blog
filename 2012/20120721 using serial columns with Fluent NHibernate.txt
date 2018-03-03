@@ -1,0 +1,37 @@
+So let's go with PostgreSql and NHibernate again. But now lets look on some problems with adding new items into database.
+I have this simple entity:
+
+```csharp
+public class List
+{
+    public virtual int ListId { get; set; }
+    public virtual string Name { get; set; }
+}
+```
+
+As you can see id is integer type. On SQL Server we would set this column to use identity for obtaining new values
+`ListId INT IDENTITY(1,1)`
+which would indicate that we want to start from Id = 1 and then increment by 1 for each new record in table.
+In PostgreSql we need to use `serial` data type, with does mainly the same - generates bigger value for each new record. So we would expect that inserting new entity with Id not set should work just fine - after all system will generate the value for us.
+And that would be true if we generated database using Fluent NHibernate or at least wrote the mappings by hand (we would probably omit the error then). But when we only generate entities mappings we will soon find out that there is an issue with our code:
+
+> ERROR: relation "hibernate_sequence" does not exist
+
+That is because by default (at least for PostgreSql) NHibernate uses its own id generator using some table in database (which I of course did not created in my database).
+It took me some time to find out how to override this setting easily. First, I looked on all available Conventions I could use in Fluent.NHibernate library. There I found `IIdConvention`, which seemed like what I need. Then I struggled a bit looking for how to convent NHibernate that ids will be generated automatically. First hint I found on the internet was to tell him, that the type of Id column is not integer, but serial, that was pretty obvious.
+After that I knew I need to modify generator used by NHibernate. Somewhere at back of my head `Identity` value was blinking, so I gave it a try, but to no avail. This would work for SQL Server probably, but not for PostgreSql. Then I tried `Native`, as it seemed reasonable - after all I want to use PostgreSql native identity mechanism. Yet, this did not work either. My last try was `Increment` (I found it somewhere on the internet to be honest). And that clicked.
+So, below is my final implementation of identity convention.
+
+```csharp
+public class IdConvention : IIdConvention
+{
+    public void Apply(FluentNHibernate.Conventions.Instances.IIdentityInstance instance)
+    {
+        if (instance.Type == typeof(int))
+        {
+            instance.CustomSqlType("Serial");
+            instance.GeneratedBy.Increment();
+        }
+    }
+}
+```

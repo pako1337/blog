@@ -1,0 +1,15 @@
+Well, yes. AngularJS. Why not? It got a lot of attention recently (or maybe I just noticed that) and it seemed like a good idea to try something new after having most of my .NET web experience with ASP.NET WebForms (and you don't want to go that way if you don't need to). So I picked it and started having fun.
+
+
+And fun it was, indeed. Pretty simple to start and create something. Nicely working, updating UI form model, updating model from UI. Clean code, clean HTML markup. I must say I'm impressed, didn't expect it to be that easy and nice (the same feeling I had with NancyFX recently, I start to see a pattern - I'm doing what I want, how I want and with tools I want - me like it).
+
+
+But there are some dark corners in Angular that got me when I least expected it. First - double declared `ng-app` attribute. Well, my fault of course. I set it on `html` element first in Master Page, done few things, changed few things and added by mistake second `ng-app` attribute in actual page, using this master page. Small error, but application stopped working, nothing behaved like expected. Blank screen, no bindings. Took me quite a while to figure it out. Oh, how I wish Angular told me - hey, man. I've noticed you put two `ng-app` attributes in your page. Sure you wanted to do that? But nope, nothing, zero, nada.
+
+
+Second time it bite me was when I was doing some model data manipulation. Everything working fine in JavaScript, but in UI - nothing gets refreshed. I used `ng-click` binding to get function executed. Oh, how much time I spent (but not wasted completely) looking for error. Everything seemed to be ok, code works, just UI isn't right. Looked at documentation, looked at StackOverflow, looked at blogs. Nothing helped. Learned a lot about Angular, but I just wanted my bindings to work! Well, look at this code:<br />
+`&lt;a href="#/" ng-click="manipulate()"&gt;Link&lt;/a&gt;`<br />
+Nothing extremely complicated. What's wrong? It have `href` attribute set. Oh boy, I had nice facepalm once I noticed it. With Angular routing set up, going to `#/` caused re-creation of my controller, reloading data and refreshing page. But it all happened so fast that I simply did not noticed and it all looked to me like my code is not working. Remove `href` and guess what? It was working like a charm from the beginning.
+
+
+I'm pretty sure I will have quite a few problems with Angular. But it seems to be such a great tool that I am willing to solve them and learn along the way just for fun of working with something that clever.

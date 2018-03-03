@@ -1,0 +1,20 @@
+
+Take a look at the code below and spot an error:
+
+```csharp
+if (resultRequired)
+{
+    return insertData.Select(row => ExecuteInsert(cmd, insertColumns, row, onError)).ToList();
+}
+else
+{
+    insertData.Select(row => ExecuteInsert(cmd, insertColumns, row, onError));
+    return null;
+}
+```
+
+Got it? At first I didn't. Debugged once but it 'appeared' to be ok so haven't noticed the issue. Yet, insert did not happened, data did not reach database. Debugged once again - and quick glance over the code was enough to see it. Of course my code took `else` path as I didn't need results of insert for anything. And there is select, but it's never used - ergo it's never even triggered. That's one of nice features of `linq` - it will only run query if you actually need the result. But on the other hand - it is pretty easy to sometimes forget you're not firing the query and it won't do any of those function calls you set up in `Select` call.
+
+Adding `ToList()` at the end should fix the issue. Time to do some pull requests on Github!
+
+Edit: and so I did - fixed, wrote some unit tests to make sure it will work in future and posted pull request on GitHub. This is my first contribution to Open source. And I hope it won't be the last!

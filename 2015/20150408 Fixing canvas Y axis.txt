@@ -1,0 +1,95 @@
+Time to tackle one of the problems that gets on my nerver every time I do something graphic related in html. And I guess canvas is not the only element in the world with that problem.
+
+My whole life I've been using X axis with values getting bigger to the right, and Y axis with values getting bigger the higher I go. But of course that's not how things work in HTML and Canvas at all. Y axis is flipped to be precise. The higher Y value element gets, the lower it is displayed. That goes agains my every intuition. If someone is experienced with canvas drawing - that may as well make sense. Heck, it makes sense to me as well, when displaying elements on forms, pages etc. But it does not make sense when I calculate 2D graphics.
+
+I could accept the world as it is and just leave the code the way I wrote it originally - pressign up arrow decreasing Y values, and down arrow increasing them. But that is not what I want. I need to have code that matches my domain model - even if the domain model is piece of paper from second or third grade math class.
+
+Fortunately, doing amendments in code to display the graphics correctly is not all that hard. First problem is - what do I have to do to make it work? Well, I need to flip the Y axis coordinates on screen, that's for sure. Simple enough:
+
+```javascript
+function drawObject(gameObject) {
+	var x, y;
+	drawingContext.beginPath();
+
+	drawingContext.strokeStyle = "#F00";
+	drawingContext.fillStyle = "#F00";
+
+	x = gameObject.Position.X;
+	y = gameObject.Position.Y;
+	drawingContext.arc(x, -y, gameObject.Size, 0, 2 * Math.PI);
+	drawingContext.stroke();
+	drawingContext.fill();
+
+	drawingContext.closePath();
+
+	drawingContext.beginPath();
+
+	drawingContext.strokeStyle = "#0F0";
+
+	x = gameObject.Position.X + gameObject.FacingDirection.X * gameObject.Size / 2;
+	y = gameObject.Position.Y + gameObject.FacingDirection.Y * gameObject.Size / 2;
+	drawingContext.moveTo(x, -y);
+
+	x = gameObject.Position.X + gameObject.FacingDirection.X * gameObject.Size;
+	y = gameObject.Position.Y + gameObject.FacingDirection.Y * gameObject.Size;
+	drawingContext.lineTo(x, -y);
+	drawingContext.stroke();
+}
+```
+
+This does fix the problem, Y values are flipped, resulting in picture mirrored around X axis. Perfect. Well, to a point. If I put an object on position `50, 50` - it is not visible on the screen. Well, if I flip the Y part, I get `50, -50`, so the object will get displayed above the top part of canvas. Makes total sense, but is not exactly what I wanted - I don't want to create my objects with negative Y values (although I could do just that). I think I would like to move entire `0, 0` point from top left to bottom left corner of the screen. To do that, I just have to decrease X values of any object by canvas height.
+
+That would do, of course. But what if later on I will want to move displayed area to different game part? Say for example if player moves to the edge of the screen? Since I'm already deep in messing with displaying graphics, why not do it now?
+
+The idea is simple - I will hold the viewport area in variable and adjust display screen to fit the viewport. For the moment I will only hold the upper limits of the viewport, limiting displayed area to those values, assuming that whole screen should be used to display as much of the area as possible. In future that viewport could be extended to support different size of devices and scale graphics appropriately to display more or less the same game area size (so all players will be able to see the same part of playing area).
+
+```javascript
+var viewport = { x: 0, y: canvas.height };
+
+function drawObject(gameObject) {
+	var x, y;
+	drawingContext.beginPath();
+
+	drawingContext.strokeStyle = "#F00";
+	drawingContext.fillStyle = "#F00";
+
+	x = gameObject.Position.X - viewport.x;
+	y = gameObject.Position.Y - viewport.y;
+	drawingContext.arc(x, -y, gameObject.Size, 0, 2 * Math.PI);
+	drawingContext.stroke();
+	drawingContext.fill();
+
+	drawingContext.closePath();
+
+	drawingContext.beginPath();
+
+	drawingContext.strokeStyle = "#0F0";
+
+	x = gameObject.Position.X + gameObject.FacingDirection.X * gameObject.Size / 2;
+	y = gameObject.Position.Y + gameObject.FacingDirection.Y * gameObject.Size / 2;
+	x -= viewport.x;
+	y -= viewport.y;
+	drawingContext.moveTo(x, -y);
+
+	x = gameObject.Position.X + gameObject.FacingDirection.X * gameObject.Size;
+	y = gameObject.Position.Y + gameObject.FacingDirection.Y * gameObject.Size;
+	x -= viewport.x;
+	y -= viewport.y;
+	drawingContext.lineTo(x, -y);
+	drawingContext.stroke();
+}
+```
+
+As you can see all I am doing is decreasing x and y parts of every drawn element by viewport limits. This way if my display size is `220, 220` and my object is at `50, 50`, after calculations I will get `50, -170` and object will get displayed 50 units above bottom left corner. Notice that x part of viewport is set to 0 - I don't want to do any translation along x axis after all - left corner stays left. I just want to move it from top to bottom - hence viewport y is initialized to canvas height. Now if player moved to the top right edge of the screen all I have to do is update the viewport with appropriate values and display area will get corrected.
+
+But that's not all. View looks OK, but the input from player is all messed up! I'm getting mouse position in canvas coordinates, and those no longer match object posiotion in any reasonable way. The same translations and flipping has to be applied to any user input as well:
+
+```javascript
+var mouse = input.mouse;
+var vector = {
+	x: (mouse.x - gfx.viewport.x) - p.Position.X,
+	y: -(mouse.y - gfx.viewport.y) - p.Position.Y
+}; // invert y axis input
+```
+
+First I apply viewport translations, then I flip the value around to get it to game area coordinates. And now it works the same way it did before. Just better :)

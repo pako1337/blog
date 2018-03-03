@@ -1,0 +1,125 @@
+With players moving and all, it is time to introduce some action! I hope to see some pixels flying all over the place, and see all those players respawning like crazy. But to get that, there needs to be a way to fire some projectiles, right?
+
+```javascript
+function mouseMove(e) {
+	var targetRect = document.getElementById("arena").children[0].getBoundingClientRect();
+	mouseCoordinates = { x: e.clientX - targetRect.left, y: e.clientY - targetRect.top };
+	mouseCoordinates.x = mouseCoordinates.x - args.viewport.x;
+	mouseCoordinates.y = -(mouseCoordinates.y - args.viewport.y);
+	console.log(e.buttons);
+	if (e.buttons && 1) {
+		keys.push(1);
+	}
+	else if (keys.indexOf(1) >= 0) {
+		keys.splice(keys.indexOf(1), 1);
+	}
+
+	args.inputChanged({ direction: buildDirectionKey(), mouse: mouseCoordinates });
+}
+```
+
+What has been added is handling mouse button pressed events. Well, to be precise - I get the info about mouse buttons state with mouse move event, which is handy. I use this to push the value 1 to list of keys pressed. This is safe since no keyboard keys can cause 1 to be added - this is not printable character. Simple, consistent. I've also added `LeftMouse: 16` into my enum-like object holding keys map. This all get send to server. And what it does is:
+
+in RaimHub.cs
+
+```csharp
+public void PlayerMoving(PlayerInput input)
+{
+	UpdatePlayers();
+	var player = players[Context.ConnectionId];
+	var createdObjects = player.ProcessInput(input);
+	gameObjects.AddRange(createdObjects);
+	Clients.All.PlayerMoved(player, createdObjects);
+}
+```
+
+in Player.cs
+
+```csharp
+public IEnumerable<IGameObject> ProcessInput(PlayerInput input)
+{
+	ProcessDirection(input.KeysInput);
+	FacingDirection = input.FacingDirection;
+
+	if (input.KeysInput.HasFlag(KeysInput.MouseLeft))
+	{
+		var bullet = Bullet.Create(Position.X, Position.Y, FacingDirection);
+		return new[] { bullet };
+	}
+
+	return Enumerable.Empty<IGameObject>();
+}
+```
+
+And last, but not least, Bullet.cs
+
+```csharp
+public class Bullet : IGameObject
+{
+	private DateTime lastUpdate = DateTime.Now;
+
+	public Guid Id { get; private set; }
+	public Vector2d Position { get; set; }
+	public Vector2d Speed { get; set; }
+	public Vector2d FacingDirection { get; set; }
+
+	private Bullet() { }
+
+	public static Bullet Create(double x, double y, Vector2d direction)
+	{
+		return new Bullet()
+		{
+			Id = Guid.NewGuid(),
+			Position = new Vector2d(x, y),
+			Speed = direction.Unit().Scale(10),
+		};
+	}
+
+	public void Update(DateTime updateTime)
+	{
+		var changeTime = updateTime;
+		var timeBetweenEvents = changeTime - lastUpdate;
+
+		Position.X += Speed.X * timeBetweenEvents.TotalSeconds;
+		Position.Y += Speed.Y * timeBetweenEvents.TotalSeconds;
+
+		lastUpdate = changeTime;
+	}
+}
+```
+
+And also drawing on client side, we can't forget drawing:
+
+```javascript
+var drawArena = function () {
+	drawingContext.clearRect(0, 0, canvas.width, canvas.height);
+
+	for (var i = 0; i < players.count(); i++) {
+		var gameObject = players.get(i);
+		drawPlayer(gameObject);
+	}
+
+	for (var i = 0; i < gameObjects.length; i++) {
+		var gameObject = gameObjects[i];
+		drawingContext.beginPath();
+
+		drawingContext.fillStyle = "rgba(0, 0, 0, 1)";
+		x = gameObject.Position.X - viewport.x;
+		y = gameObject.Position.Y - viewport.y;
+
+		drawingContext.arc(x, -y, 2, 0, 2 * Math.PI);
+		drawingContext.fill();
+		drawingContext.closePath();
+	}
+};
+```
+
+Easy, right? I'm not entirely sure about my design decissions yet. Well, I'm pretty sure that this is not all OK and it will soon change, but for the moment it gets things done.
+
+But what is so bad about it? Well, to start - there are separate collections of players and game objects, handled separately in drawing. And nobody likes special cases, right? I imagine this should be all handled the same way - just a list of objects that take action in game, possibly with each object knowing how to paint itself (or, more reasonably, specialized classes responsible for drawing all different projects).
+
+Second thing is - my bullets don't move. This is related to first thing. With separate collection of game objects, I did not write code that triggers bullets update.
+
+Third - mouse clicks are only detected when mouse is moving. Take that campers! But no, for real that is an issue that needs to be handled.
+
+In all honesty I've made a piece of code that makes player drop black dots when moving mouse. That's not gonna sell. But I'm not finished yet.

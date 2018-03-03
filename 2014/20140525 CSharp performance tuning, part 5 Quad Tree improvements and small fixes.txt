@@ -1,0 +1,174 @@
+After introduction Quad Tree implementation performance degraded. Less collision checks is happening but tree implementation cost outweights those benefits. Profiler clearly shows that `QuadTree.GetObjects()` method is slowest one. No wonder - it needs to get all child objects, which means allocating at least few arrays, merging them etc. But that can be fixed. Again - paying the price in memory should give us benefit of faster calculations.
+
+What can be done is introduction of some kind of store of all child objects. After all, when I'm requesting all objects, I don't care which node they come from or in what order. So let's do second collection, alongside `_objects` one.
+
+```csharp
+        private List<Triangle> _objects;
+        private List<Triangle> _allChildren;
+		
+        ...
+
+        private QuadTree(Rectangle area, uint level)
+        {
+            _level = level;
+            _objects = new List<Triangle>(4);
+            _allChildren = new List<Triangle>(200);
+            _nodes = new QuadTree[4];
+            _area = area;
+        }
+```
+		
+There can be quite a few child objects involved so initial collection size is set to 200. Adjustments need to be made to insert and retrieval methods as well.
+
+```csharp
+        public void Insert(Triangle obj)
+        {
+            if (_nodes[0] != null)
+            {
+                int index = GetIndex(obj);
+                if (index != -1)
+                {
+                    _allChildren.Add(obj);
+                    _nodes[index].Insert(obj);
+                    return;
+                }
+            }
+
+            _objects.Add(obj);
+
+            if (_objects.Count > 4 && _level < MaxLevel)
+            {
+                if (_nodes[0] == null)
+                    Split();
+
+                int i = 0;
+                while (i < _objects.Count)
+                {
+                    int index = GetIndex(_objects[i]);
+                    if (index != -1)
+                    {
+                        Triangle objToMove = _objects[i];
+                        _objects.Remove(objToMove);
+                        _allChildren.Add(objToMove);
+                        _nodes[index].Insert(objToMove);
+                    }
+                    else
+                        i++;
+                }
+            }
+        }
+		
+		...
+		
+		private IReadOnlyList<Triangle> GetChildObjects(Triangle obj)
+        {
+            if (_nodes[0] == null)
+                return new Triangle[0];
+
+            int index = GetIndex(obj);
+            if (index != -1)
+            {
+                return _nodes[index].GetObjects(obj);
+            }
+            else
+            {
+                return _allChildren;
+            }
+        }
+
+        public IReadOnlyList<Triangle> GetObjects()
+        {
+            var all = new List<Triangle>(_objects);
+            all.AddRange(_allChildren);            
+            return all;
+        }
+```
+		
+Each time we add object to child nodes, we are also storing it in additional collection which will allow us to get those objects without need of traversing the tree. Price in memory can be big if we will have a lot of objects though, since we are storing additional references at each tree level until the final one, where the object belongs.
+
+But performance improved nicely: `25` and `7` milliseconds for serial/parallel versions gets me back where I was before.
+
+What does profiler says? `GetObjects` is now much lower on dotTrace's HotSpot list. We're back with slowdown being in `Triangle.Contains` and `Triangle.SegmentsAreCrossing` methods. So testing whether one of three sides crosses any other side and if any single point is inside other triangle.
+
+First segments - we are checking all three segments of first triangle against all three segments of second triangle. But we don't need to. We only need to check two segments. Why? Well, triangles are either intersecting at two sides minimum or, if they are intersecting at only one side - that means one point of triangle must be inside the other, which is covered by the second check. And second think - we are using LINQ's `Any` queries. LINQ is awesome querying tool, but it probably introduces some performance penalties. And I know exactly how many sides I have, I know what data structure I'm using, so I can take advantage of that. Avoiding loops can be pretty effective performance optimization.
+
+```csharp
+        private bool SegmentsAreCrossing(Triangle b)
+        {
+            return
+                _lines[0].Intersects(b._lines[0]) ||
+                _lines[0].Intersects(b._lines[1]) ||
+                _lines[0].Intersects(b._lines[2]) ||
+                _lines[1].Intersects(b._lines[0]) ||
+                _lines[1].Intersects(b._lines[1]) ||
+                _lines[1].Intersects(b._lines[2]);
+        }
+```
+		
+Just this change saves another 5ms from sequential version. It is still pretty readable and easy to maintain, however it could potentially be easy to make some error in indexing those lines.
+
+Another profiler check and `Contains` is high on HotSpot list, but there is another method, which takes a lot of time due to lots of calls - `Rectangle.Intersects`. After all in each collision check we are checking bounding boxes first, resulting in 664 184 rectangle intersection checks. But the code there is simple, what can be done about it?
+
+Well, it is simple, but there four additions in those checks. And what do they calculate? Right and top position of rectangle. That clearly does not change throughout rectangle's lifetime, so we can pre-calculate this.
+
+```csharp
+        _rightTop = new Point(LeftBottom.X + Width, LeftBottom.Y + Height);
+
+        public bool Intersects(Rectangle b)
+        {
+            return
+                _rightTop.X >= b.LeftBottom.X &&
+                LeftBottom.X <= b._rightTop.X &&
+                _rightTop.Y >= b.LeftBottom.Y &&
+                LeftBottom.Y <= b._rightTop.Y;
+        }	
+```
+
+It even seams easier to read. Another 1ms saved. Not much, but that's still 20% saving compared to what it was.
+
+Now there's no running from `Triangle.Contains` method. But that method is pretty simple. Of course we can also rewrite it to not use LINQ loop, but that probably won't save us significant amount of time alone. Especially when profiler says that we are doing close to 200 000 calls to `Sign` method. And that's where I'll be looking next.
+
+There is one thing we can optimize there - we are always calculating start and end x and y variable difference. That's a constant value for line segment so we can reuse it. I'll call it reversed width and height respectively, since it take start - end. While we're at it - there are similar things to be optimized in `Intersects` method - a lot of repeated calculations. I'll fix that too, since I'm already messing with the class.
+
+```csharp
+        public Line(Point start, Point end)
+        {
+            Start = start;
+            End = end;
+            _width  = End.X - Start.X;
+            _height = End.Y - Start.Y;
+            _revWidth  = Start.X - End.X;
+            _revHeight = Start.Y - End.Y;
+        }
+
+        public static Line Create(int x1, int y1, int x2, int y2)
+        {
+            return new Line(new Point(x1, y1), new Point(x2, y2));
+        }
+
+        public bool Intersects(Line b)
+        {
+            double denominator = b._height * _width - b._width * _height;
+            int startXDiff = Start.X - b.Start.X;
+            int startYDiff = Start.Y - b.Start.Y;
+            double aNumerator = b._width * startYDiff - b._height * startXDiff;
+            double bNumerator = _width * startYDiff - _height * startXDiff;
+
+            if (denominator.IsZero())
+                return aNumerator.IsZero() && bNumerator.IsZero();
+
+            double aParameter = aNumerator / denominator;
+            double bParameter = bNumerator / denominator;
+
+            return aParameter > 0 && aParameter <= 1 &&
+                   bParameter > 0 && bParameter <= 1;
+        }
+
+        public double Sign(Point point)
+        {
+            return _revHeight * (point.X - End.X) - _revWidth * (point.Y - End.Y);
+        }
+    }
+```
+
+And it gives another 1-2ms saved. Add to that replacing LINQ in Contains method and we are finally below 16ms! `13` ms for serial and `4`ms for parallel versions are good - almost 140 times faster than initial, naive implementation! But is it good enough? Not yet. But more on that in next post.

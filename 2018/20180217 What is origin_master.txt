@@ -1,0 +1,19 @@
+When using git, there are few concepts that are hard to grasp at first, but are (in my opinion) required to get fluent with it. It does not matter if you are using GitHub, BitBucket, Gitlab - figuring out how it works (at more than basic commit/push/pull level) will be very useful when you will try to set up your workflow or when you find yourself in a corner.
+
+One of those concepts I think is - what is origin/master? How does it differ from master?
+
+Collegue of mine had a problem where he could not reproduce issue with code. We thought it may have been related to latest changes on master branch, that were not included into his branch. But he insisted that he in fact did merged master branch changes. Spoiler: he did not.
+
+What my collegue was doing was: `git merge origin/master`. Now that's perfectly fine, I said, but you are not getting latest changes that were made by others in our team. "But I am calling `origin/master`, so I am getting latest, freshest code, right?". Nope, you are not. `origin/master` is not latest code. It is latest code *since the last time you contacted origin server*.
+
+Here's how it goes. You contact server sometime, usually when you are doing operations like `pull`, `push`, `fetch`. Then your local copy of repository gets latest code changes, updates your branch pointers etc. But - not all pointers. Just those that are reflection of server state, like `origin/master`, `origin/nasty_bug_solution`, `origin/new_fancy_feature` etc. But your `nasty_bug_solution` branch will stay unchanged - unless you will merge changes (or you are doing `pull` which merges changes automatically).
+
+So now you have your latest version of code, you are at the same place where `origin` server is. But that's not forever. In a few minutes your collegue may add  something to `master` branch and whoops! you're out of date. But that's OK, that's cool. That's what makes git - git. You can work offline with your branches, not requiring asking server over and over again what's going on there. Just keep in mind that when you are doing `git merge origin/master` - you are checking and merging your *local* version of branch, last state you have *seen* on server, not what is there *now*.
+
+{{git origin master flow.png}}
+
+In graphics above you can see how it flows - unless you do `git fetch` (or `git pull` which fetches underneath) - you won't get server status update. You can merge all you want - code will still be in the state it was.
+
+So if you want to update your branch with latest-freshest master copy - do `git pull` and `git merge origin/master` afterward. That's the way to success!
+
+Or, if you are feeling frisky, you can try `git pull origin matser` - pull changes from server `origin`, branch `master` on that server, and then merge those changes into my current branch. But that's only for the bravest! Will you dare?

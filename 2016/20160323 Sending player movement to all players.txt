@@ -1,0 +1,93 @@
+Once the player has pressed the key and we got the info, everyone would expect the application to react to it somehow. Fortunately that is pretty simple - I defined callback in my `Area` code that will be called every time game notices player wanting to change the position. To this callback client side hub will subscribe a method sending communication to server. This in turn will modify player's status on the server side and send updated position to all other players, letting them see position change.
+
+`Arena.js`  
+```javascript
+var keyDown = function (e) {
+	var key = 0;
+	if (e.which === 87 || e.which === 119 || e.which === 38)
+		key |= moveDirections.Up;
+
+	if (e.which === 83 || e.which === 115 || e.which === 40)
+		key |= moveDirections.Down;
+
+	if (e.which === 65 || e.which === 97 || e.which === 37)
+		key |= moveDirections.Left;
+
+	if (e.which === 68 || e.which === 100 || e.which === 39)
+		key |= moveDirections.Right;
+
+	if (key > 0)
+		playerMoving({ direction: key });
+};
+
+var playerMoved = function (who) {
+	var player = players.get(who.Name);
+	player.Position = who.Position;
+	drawArena();
+};
+```
+
+`raim.js`  
+```javascript
+var arena = new Arena({
+	playerMoving: function (e) {
+		raim.server.playerMoving(e.direction);
+	}
+});
+
+raim.client.registered = arena.addNewPlayer;
+raim.client.playerMoved = arena.playerMoved;
+```
+
+`RaimHub.cs`
+```csharp
+public void PlayerMoving(int direction)
+{
+	var player = players[Context.ConnectionId];
+	player.Position.X += 10; // draft implementation
+	Clients.All.PlayerMoved(player);
+}
+```
+
+It gets very 'drafty' at points, but the idea is clear. And it works - server gets notification, sends player position back, using player's name I get his object and set new position (and name will be later changed to Id of some sort in future, of course). There is one problem though - the new player position is printied, true, but the old one gets displayed as well.
+
+Well, not quite. The old one was just not removed from screen. Canvas needs to be cleared between refreshes.
+
+```javascript
+var drawArena = function () {
+	drawingContext.clearRect(0, 0, view.width, view.height);
+	for (var i = 0; i < players.count() ; i++) {
+		var player = players.get(i);
+
+		drawingContext.strokeStyle = "#F00";
+		drawingContext.fillStyle = "#F00";
+		drawingContext.arc(player.Position.X, player.Position.Y, player.Size, 0, 2 * Math.PI);
+		drawingContext.stroke();
+		drawingContext.fill();
+	}
+};
+```
+
+`clearRect` is supposed to remove content form the part of the screen it was pointed to (`view` is initialised in constructor with actual available screen width and height). This implementation however does not work. `clearRect` is not clearing screen, marking pixels as white, transparent or whatever.
+
+What is missing is - every time we draw on canvas, we do it to create some path. And every time we call `fill` or `stroke` that path gets filled with colors defined. I haven't defined any path though, so it is putting all requests into the same path, never closing it. So even though the `clearRect` clears the screen, first time `stroke` and `fill` functions are called, all historical changes to path are being repainted again and again - since the path was not cleared.
+
+How to solve it? Oh, simple - open new path for every object that is being drawn (or even for every part of an object, once they get more complex).
+
+```javascript
+var drawArena = function () {
+	drawingContext.clearRect(0, 0, view.width, view.height);
+
+	for (var i = 0; i < players.count() ; i++) {
+		var player = players.get(i);
+
+		drawingContext.beginPath();
+		drawingContext.strokeStyle = "#F00";
+		drawingContext.fillStyle = "#F00";
+		drawingContext.arc(player.Position.X, player.Position.Y, player.Size, 0, 2 * Math.PI);
+		drawingContext.stroke();
+		drawingContext.fill();
+		drawingContext.closePath();
+	}
+};
+```

@@ -1,0 +1,35 @@
+On project I'm currently working on there was a need to customise the look of one part of User Interface. Simply, we need to represent different data types in different ways. Some look somewhat similar, some should be highly customised.
+
+What previous developer working on this project decided was to try to put it all into one `User Control`. At first it was working all right since all data types were very similar, there was just one special case which he covered with simple if statement. Everything worked fine and was pretty simple, so no problem there. But the only thing you can assume about requirements is: requirements changes over time. So there was second special case, and then third one. Special cases stopped being so special after all. And `if` statements were all over the code, customising value calculations, texts on labels, values to select from etc. Spaghetti code at its finest.
+
+To give justice to that developer - application he was developing was just a demo code to present possibilities that lies in technology that could simplify work of many people and influence life of many others. Yet, as some of you may have experienced it by themselves, demo apps sell all to easy and buyers expect app to be ready quickly (after all it's almost ready, we've seen it working, just add one or two features we need and it is done!). Lesson learnt - even demo apps need to be written carefully.
+
+But how to deal with this problem? On many systems, the easiest way would be to simply create all kinds of user interface controls, put them on the form and show only the one required, by setting `visibility` or any equivalent. And I think that this is fine (up to some point, as always) in many systems. On mobile platform however, you need to be very careful about memory usage. Putting 5 or 6 different user controls, all of them consisting of many child controls and taking up memory and yet not being used or even shown to user - that's a waste. What you then do is you create needed control manually in code and put it in required place. How then do you decide which control to use? `If` statement of course, what did you think! You write some code and suddenly you see that all ugliness of previous code was just moved one level higher. Of course this code does not look that bad if you have simple cases on which you decide which control to use, but that's not always true.
+
+In such cases you should think of `Factory` **design pattern**. This useful pattern helps you to put the ugly code that decides which control to use into another class whose whole purpose is to decide on that and prepare required objects. Your main class uses factory and stays clean and readable, your factory class hides all ugly code but at the same time is also quite easy to read since creating new objects is its whole purpose.
+
+How does it look in actual code? Somehow like this:
+
+```objc
+// factory class
+-(UserControl*)getUserControlBasedOnObject:(SomeObject*)object {
+    UserControl *uc = nil;
+    if ([object checkValue1] {
+        uc = [[UserControl1 alloc] initWithNibName:@"UserControl1" bundle:nil];
+        uc.titleLabel = [NSString stringWithFormat:@"Control1 for object: %@", object.type];
+    } else if ([object checkValue2] || (object.property1 && object.property2)) {
+        uc = [[UserControl2 alloc] initWithNibName:@"UserControl2" bundle:nil];
+        uc.titleLabel = [NSString stringWithFormat:@"Control2 for object: %@ - %@ special edition", object.type, object.property1];
+    }
+}
+
+// using class
+-(void)viewDidLoad {
+    SomeObject *object = ... // obtain object somehow
+    FactoryClass *factory = [[FactoryClass alloc] init];
+    UserControl *userControl = [factory getUserControlBasedOnObject:object];
+    [self.containerView addSubview:userControl];
+}
+```
+
+Of course this code is not perfect, there is plenty that can be done to make it better, like injecting factory somehow, or at least getting factory from some method invocation, to make it easier to unit test, but that's different case. Main point is: our main class is pretty clean and straightforward, while factory is a little bit more polluted, but at least it's concentrated on single purpose. `S` from `SOLID`.

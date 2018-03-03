@@ -1,0 +1,99 @@
+Some time ago I watched this great video: https://youtu.be/zdI2Z64Jdw8 . Seriously - if you are doing front end html and css, go and watch it, it is great. Basically what guy is showing is how to get responsive pages that will adjust to screen size without using media queries. While I'm pretty certain it is not always worth doing, I do think it is worth trying out first on side projects.
+
+Now I'm not doing front end all that much. I can write html and css to do the things I want them to, but more often than not I need to use big hammer to make it all fit in place. Raim on the other hand is so small and simple that I decided to give it a try and not use any media queries for now (not that I have used any to this point) as well as to avoid absolute units. So no pixels for you, mister!
+
+There are just a few things at this point I want to position on the page. Those are: name of the application along with competition logo, list of players and game arena, where canvas is injected. Before today the code looked like this:
+
+```css
+.titleSection {
+    position: fixed;
+    left:    10px;
+    bottom:  7px;
+    opacity: 0.3;
+    font-weight: bold;
+    /*transition: opacity ease-in .2s;*/
+}
+
+.titleSection:hover {
+    opacity: 0.9;
+}
+
+.dsp2016 {
+    background-image: url(/Content/DSP2016.png);
+    background-size: contain;
+    width: 21px;
+    height: 48px;
+    display: inline-block;
+}
+
+#playersList {
+    opacity: 0.7;
+    font-size: small;
+    display: inline-block;
+    position: absolute;
+    bottom: 70px;
+}
+
+#arena {
+    z-index: -1;
+    border: 1px solid black;
+    position: fixed;
+    top:    5px;
+    right:  5px;
+    bottom: 5px;
+    left:   5px;
+}
+```
+
+Some pixels are creeping out. Positioning content some pixels above or below will most likely fail on screens with higher dpi. Well, it will still work, but it might not put as much spacing between elements as I would like. Size of logo, too, should be responsive and adjust itself, to always be visible, but not get too big. 
+
+After improvements page looks pretty much the same way it did before, but the css file now has this inside of it:
+
+```css
+.titleSection {
+    position: fixed;
+    left:    1em;
+    bottom:  0.5em;
+    opacity: 0.3;
+    font-weight: bold;
+    transition: opacity ease-in .2s;
+}
+
+.titleSection:hover {
+    opacity: 0.9;
+}
+
+.dsp2016 {
+    background-image: url(/Content/DSP2016.png);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    width: 2em;
+    height: 2.5em;
+    display: inline-block;
+}
+
+#playersList {
+    opacity: 0.7;
+    font-size: smaller;
+    display: inline-block;
+    position: absolute;
+    bottom: 5em;
+    left: 1em;
+}
+    #playersList span {
+        display:block;
+    }
+
+#arena {
+    z-index: -1;
+    border: 0.1em solid black;
+    position: fixed;
+    top:    0.3em;
+    right:  0.3em;
+    bottom: 0.3em;
+    left:   0.3em;
+}
+```
+
+First look at `dsp2016` class. Width and height are in relative units, 2.5x2 units in size, with also added no repeat and centering of background image. This places the image nicely, with some spacing around it. All the positions of other elements are also relative to font size now. I can now preserve the ratio of view with simply changing body font size. All will stay in the same relation to each other, players list and game logo will stay inside bordered game arena, never overlaying each other.

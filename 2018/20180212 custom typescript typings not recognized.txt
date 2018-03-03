@@ -1,0 +1,21 @@
+For a while we got problem in our project where TypeScript typings (*.d.ts files) were not recognized. This resulted in many failed builds. Solution was rather straightforward - reference those files directly, for example by code like this:
+
+```typescript
+/// <reference path="shared/my_custom_typings.d.ts" />
+```
+
+While this works - it is far from perfect - those typings should be automatically recognized.
+
+Turns out when bumping typescript version at some stage they did introduce a change. While in older version directory structure like this was OK, in newer requirements changed - and so our directory structure had to follow.
+
+We had to move our `d.ts` files into dedicated directories, one for each typing, following structure something like:
+
+```
++ shared
+    + my_custom_typings
+        - index.d.ts
+    + my_other_library_typings
+        - index.d.ts
+```
+
+And with that we could get rid of all `reference` directives as they got loaded automatically (of course there still has to be some kind of indication where to look for those common, shared typings - set it up in tsconfig.json!)

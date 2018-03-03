@@ -1,0 +1,61 @@
+With SignalR loaded, it is time to do some client-server communication. First we will need to define hub to which we will be connecting from client, and in it some methods we would like server to perform for us. Something as simple as:
+
+```csharp
+public class RaimHub : Hub
+{
+	public void Register(string name)
+	{
+		Clients.All.Registered(name);
+	}
+}
+```
+
+I don't think it can be any easier than that. We will call the `Register` method from javascript, passing name as parameter and in response all connected clients should get newly registered client's name.
+
+On client side we than need some code as well:
+
+```javascript
+$.connection.raimHub.server.register("jporwol");
+```
+
+With SignalR registered, there is `connection` object initialized, through which we can get to our hub. Notice convention changed from `PascalCase` to `camelCase` - each language gets what is standard for it, and library takes care of making it all work. F5 gets application running and, not much of a surprise, it fails. Honestly I don't remember the last time I wrote the piece of code that worked from scratch!
+
+```
+Uncaught Error: SignalR: Connection must be started before data can be sent. Call .start() before .send()
+```
+
+Fair enough, I did not initialized hub. Easy to fix. We just call `start` and we get promise. When the promise is done, we can communicate with server.
+
+```javascript
+$.connection.hub.start().done(function () {
+	$.connection.raimHub.server.register("jporwol");
+});
+```
+
+Breakpoint set in VS, application warming up and now all is perfect. Call gets to hub, it sends the name back to all clients (including the one that sent the message in the first place). Obviously that did nothing - there is no way to handle this message in client side. So there needs to be a function registered that will know how to handle those.
+
+```javascript
+var raim = $.connection.raimHub;
+$.connection.hub.start().done(function () {
+	raim.client.registered = function (who) {
+		console.log(who);
+	};
+	
+	raim.server.register("jporwol");
+});
+```
+
+It should simply log the name to the console window. Should, but does not. What is wrong here? I was determined to figure this one out without documentation. This wasn't my first time playing with SignalR after all, even though I have forgotten most of it. After checking letter casings and typing errors I was stuck.  
+Then it came back to me - callbacks have to be registered *before* connection is initialized. Not sure why, it does not make immediate sense to me - but that's how it has to be. Small fix:
+
+```javascript
+var raim = $.connection.raimHub;
+raim.client.registered = function (who) {
+	console.log(who);
+};
+$.connection.hub.start().done(function () {
+	raim.server.register("jporwol");
+});
+```
+
+And I'm back in the saddle! Till next time!

@@ -1,0 +1,43 @@
+With keyboard movement it is time to handle some mouse inputs as well. Player should be able to move with keyboard but he or she needs to be able to face some directions, aim and probably shoot by mouse interaction.
+
+First part seems pretty straightforward. There is `mouseMove` event waiting to be used. Let's start with just that:
+
+```javascript
+// renamed from keyboardInput to userInput
+function userInput(args) {
+    // old code
+
+    function mouseMove(e) {
+        console.log(e);
+    }
+
+    (function () {
+        // ...
+        document.addEventListener("mousemove", mouseMove);
+    })();
+};
+```
+
+Now whenever mouse moves over document event will be raised and its arguments get logged to console. That's a lot of inputs but we can handle that, just need to make processing short to not block it for too long.
+
+Inspecting event arguments there are many different properties, including many different positions of mouse event: `screen`, `client`, `layer`, `offset`. Uh, easy to get lost. Thanks for google and Mozilla Developer Network, which tells that `offset` is exactly what I want - x and y offset from event target's edge. Ah, no, wait - that will only work when mouse is moved over canvas area. How about other parts of window? Well, one might assume that only canvas is appropriate for handling those events. Others might argue that whole window area should be used. I guess both can be right, depends on what one wants to achieve. I am slightly more attracted by the whole window option. If user points to players list - I would still like to have events handled correctly. So that's what I will do.
+
+But if player moves mouse outside of canvas area, `offset` will be of no use. Thankfully - `client` can be used, with a little bit more code. All we need to do is - to calculate position of mouse in context of canvas. Of course those values can get weird - like negative position etc. but that should not scare anyone. To do this calculation I need position of canvas in context of window. That's quite easy:
+
+```javascript
+document.getElementById("arena").children[0].getBoundingClientRect()
+```
+
+This gives rectangle with coordinates of canvas (first and only child of arena element) in relation to window. In my case, when there are no scrollbars, that's perfect. In other cases, if you scroll below canvas start - values get negative - and it makes sense - canvas would start higher than window reaches.
+
+And all this adds to:
+
+```javascript
+function mouseMove(e) {
+	console.log({ x: e.clientX, y: e.clientY });
+	var targetRect = document.getElementById("arena").children[0].getBoundingClientRect();
+	console.log({ x: e.clientX - targetRect.left, y: e.clientY - targetRect.top });
+}
+```
+
+Logged values are first screen position and then position inside canvas, which can later be used to my calculations.

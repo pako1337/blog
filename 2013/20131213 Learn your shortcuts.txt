@@ -1,0 +1,11 @@
+How much time do you spend in editor working with code? Debugging it? Hopefully a lot. How much time do you spend working with your keyboard? Hopefully most. Mouses are evil. It takes to much time to move hand to mouse, select option, click, move hand back.
+
+But there's a better way! Learn shortcuts! Visual studio have lots of them. Resharper too. Web browser? Sure does. Total Commander? Windows? Vim? Shortcuts all the way.
+
+I always tried to learn how to do things with keyboard rather than mouse for more efficiency. Some time ago I started writing stuff in Vim. That's when I learned mouse is mostly useless when writing stuff. Now I'm back to good ol' Visual studio with Resharper and I usually don't even think about touching mouse. And I cringe when someone's searching menu with mouse or (God forbid) clicks right mouse button to do something.
+
+First - shortcuts are simple. So simple that after few usages, your fingers will remember how to do them without you thinking about what exactly needs to be pressed. Ctrl+Shift+B for build is as natural for me, as Ctrl+S ever was. Ctrl+U+R, Ctrl+U+U and Ctrl+U+L are so natural for me that I had to check this shortcut right now because I didn't remember it. My fingers do - when I'm in VS they know what to do. F9, F10, F11 - you all know them in debugging I hope. What about Ctrl+F10 and Shift+F11?
+
+But I don't know all the shortcuts. When and how do I learn them? I go with simple rule of thumb - if I'm doing something once - that's cool, I can click it. Second time - well, ok - I will go with you one more time, you evil mouse! Third time? You won't trick me, I'll google the shortcut and will google it again and again until I'll teach my fingers how to do it properly. No more pointing and clicking.
+
+And my hands are better on keyboard as well, holding mouse is fine only when I'm shooting at those filthy zombies. Left 4 Dead - here I come!

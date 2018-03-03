@@ -1,0 +1,30 @@
+Recently I’ve been interested in building software by following `Domain Driven Design` approach. I couldn't try my knowledge on any business project yet, but it didn't stop me (and should not stop you, dear reader) from looking around for some interesting solutions to common problems. One of the problem is communication between `Bounded Contexts` and signalling that some actions have been performed. Very natural seems concept of `Domain Events`. But you need some way to easily propagate such events between elements in your system, making sure it reached all interested parts. Here comes <a title="NServiceBus" href="http://nservicebus.com/" target="_blank">NServiceBus</a>. So I wanted to try it out and create simple test application to see how easy it is to start working with this library. Well, it is harder than I expected, thus this blog post for you, dear reader, and mostly for me for future reference.
+
+First you need to download NServiceBus and install it on your machine. There is free basic licence available allowing you to send 1 message per second, which seems enough for testing purposes. There are also other licences available, so you can choose one that suits your needs perfectly. But you don't need to download installer from their page since there is very handy NuGet package that will install NServiceBus and all dependencies for you.
+
+I've created very simple solution with 3 projects in it: Mailer - will be used as message handler, faking e-mail sending service; Messages - shared between handlers and main application, defines message contracts; nServiceBusFun - application that will be sending events. That should be enough for my purposes. I've installed NServiceBus to both Mailer and nServiceBusFun projects. Messages project needed only `NServiceBus.Interfaces` library as a reference.
+
+As a next step I've created simple event message that should pretend to be business event that could happen in business system. [gist]http://gist.github.com/4359125[/gist]
+Nothing fancy here, simple class that implements `IMessage` interface (which comes from `NServiceBus.Interfaces`) and it's great that creating message is that simple. Of course there is more you can do with messages, but for trying it out it is enough.
+
+After that I've created `EndpointConfig.cs` files, one in Mailer and one in nServiceBusFun projects. Those classes provide NServiceBus with configuration for endpoints, and both files are very similar, as you can see below.
+[gist]http://gist.github.com/4359181[/gist]
+One is simply marked as a server (this is mailer, since it recieves messages from clients) and the other is marked as publisher (nServiceBusFun, since it's posting events to service bus).
+
+So we have a message, now lets create handler. I've created `ClientRegisteredHandler.cs` file with this content:
+[gist]http://gist.github.com/4359876[/gist]
+No thrill here as well; interface tells that this class can handle messages for given type (in this case `ClientRegistered`). Handle method is invoked when NServiceBus gets such message. Simple and clean, just like we want it.
+
+Our system would not give us much inside into NServiceBus if we would not create some class to publish events. So in `nServiceBusFun` project I've added this simple class:
+[gist]http://gist.github.com/4359892[/gist]
+Also pretty self-explanatory. NServiceBus will instantiate object of this class on start up and call `Run()` method.
+
+Seems that all that we wanted to do is ready, isn't it? If we run both `Mailer` and `nServiceBusFun` applications it should be OK, our client will be started, will post event informing all interested parts of the system that new client has just registered, `Mailer` application will get this message and pretend to send an e-mail.
+
+But it does not work, at least for me. What it gives me is an exception on start of `nServiceBusFun` application that it could not find service configuration. By default it searches through all libraries in runtime folder looking for all classes that implements `IConfigureThisEndpoint` interface. I did this in `EndpointConfig` class which is in the same assembly as other parts of application, so it should work but it does not.
+
+```
+No endpoint configuration found in scanned assemblies. This usually happens when NServiceBus fails to load your assembly containing IConfigureThisEndpoint. Try specifying the type explicitly in the NServiceBus.Host.exe.config using the appsetting key: EndpointConfigurationType, Scanned path: C:\Users\Pako\documents\visual studio 2010\Projects\nServiceBusFun\Mailer\bin\Debug\
+```
+
+In next post I will try to explain why and how to fix this.

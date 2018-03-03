@@ -1,0 +1,14 @@
+Well, fast. Damn fast, if you ask me. I have ~630 unit tests running in somewhere around 90 seconds. You can't even imagine how slow it feels when you are trying to run them frequently. But when build time alone takes about 6 minutes, how fast your ut runs is negligible :(
+
+And then there comes Greg Young with his idea of fast unit tests:
+<blockquote class="twitter-tweet" lang="en">
+better: Tests run: 1734, Errors: 0, Failures: 1, Inconclusive: 0, Time: 12.9700314 seconds&mdash; gregyoung (@gregyoung) <a href="https://twitter.com/gregyoung/statuses/447069002045874176">March 21, 2014</a>
+
+<script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+<blockquote class="twitter-tweet" lang="en">
+<a href="https://twitter.com/pako1337">@pako1337</a> thats slow for me. Many are integration tests that even write files etc.&mdash; gregyoung (@gregyoung) <a href="https://twitter.com/gregyoung/statuses/447080955921321984">March 21, 2014</a>
+
+<script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+So I will keep trying to get to that level in my project. Hopefully so are you.

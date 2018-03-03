@@ -1,0 +1,33 @@
+I've recently started working with `CoffeeScript` and wanted to do things right. This means writting some tests and generally trying to follow `TDD` practices.
+Code needs to be modular - that's pretty obvious for anyone who ever worked with something else then tiny "hello world"-like programs. Having 1k Lines of Code in a file is pain. With 5k LoC it seems almost impossible to work effectively. And even more - I definitely like having my tests in separate files than my production code. So I my project structure like this:
+
+```
+-BounceToTarget
+    -spec
+        Ball.spec.coffee
+    Ball.coffee
+```
+
+For now it seems enough. Spec directory holds test files (aka. specifications). In main directory there are classes and everything else. It will probably change when project will start getting bigger, but for now it's good. Lets just take a look at files content:
+[gist]https://gist.github.com/pako1337/5338779[/gist]
+A simple class and test. It doesn't get any simpler than that, does it? BTW, if you don't know how the specifications work - take a look at <a href="http://pivotal.github.io/jasmine/" title="Jasmine tutorial">Jasmine tutorial</a> - it's all pretty easy and nice.
+
+How do I run those tests? Well, `Jasmine` says that I should create test running `html` file and include required scripts in there. Simple, sure, but - boooring. Who likes going to the browser to see if test are passing? No - I wanted to be able to run them from command line. In future this will make it easy to include them in some ` Continuous Integration` and what else. `Jasmine-node` comes to help! It allows running `Jasmine` specifications using `nodeJs`. Exactly what I was looking for.
+So I installed it:
+`npm install -g jasmine-node`
+and tried running the tests:
+`jasmine-node --coffee ./spec`
+`--coffee` parameter indicates that specifications are written using `CoffeeScript`, second parameter is simply path to directory containing specifications that needs to be run. After spending some time fighting with this tool (there is a bug that suppresses any error messages when running under `nodeJs 0.10` so it wasn't notifying me on compilation errors - workaround - try first compiling `spec.coffee` files manually if you see that `jasmine-node` quit with no error or output at all) it run my tests. And they failed.
+Reason for this is pretty obvious - there is no reference for `Ball` class in specification. In `C#` we would need to add `using` statement, but what about `CoffeeScript/JavaScript`? There is no easy way to do this. It assumes that you will include all required files onto web page (or squash them into one file and include this file). Even then it would not work correctly - `Ball` would be defined in different block of code and would not be visible outside of it.
+`CoffeeScirpt` proposes attaching the class to some global variable (like window) or exporting it using `nodeJs` exporting mechanism. First solution will work when running in browser. Second when in `nodeJs` context. But I want both - tests in `nodeJs` and normal code in browser!
+
+In this case there is no other way but to decide on runtime which export mechanism is to be used. And since `JavaScript` is dynamic language it's very easy to achieve. Just decide which variable is present and use that one as export point.
+`root = exports ? this
+root.Ball = Ball`
+`?` is `CoffeeScript` existing operator - it checks if variable is defined (i.e. is not undefined and not null) and returns that variable if defined. If variable does not exist - it returns statement on the right. `this` is object which is used to create class definition  - in browser it will be `window` instance - who would've guessed? In second line we assign our class to property on exporting point - how I love dynamic languages!
+
+OK, exporting is covered. But how to import this in specifications? It's simple since we assume our specifications will be run only from `nodeJs` - then we can use `require` method and get what we want. Below is final code:
+[gist]https://gist.github.com/pako1337/5338997[/gist]
+`Require` returns exports object. To this object we have attached our `Ball` class and now we can retrieve it and use it in our code. Re-running `jasmine-node` tool proves that everything is OK now - test passes. Problem solved!
+
+What's left? Well - it won't work if we will try using normal `jasmine html` runner. But I think I have an idea on how to solve this as well - with a little hack, but it should be fine, I hope. We will see how it turned out in next blog post. Take care!

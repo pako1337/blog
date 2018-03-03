@@ -1,0 +1,65 @@
+This is pretty popular question - which is better, inheritance or composition? I bet you wouldn't need to look for too long to find out that popular opinion is that composition is better. Not surprisingly I have to agree with that completely. Many computer science courses will show you inheritance as a way to go in Object-Oriented language and naturally many people (me included) assume that it's good, clear and easy. After all we reuse code, aren't we? But it won't take you much time in any non-Hello World project to figure out that it causes more trouble than it gives you benefits
+
+I've recently seen a code that follows pattern like this:
+
+```csharp
+public class Document
+{
+    public int Id { get; set; }
+    public string Content { get; set; }
+}
+
+public class DocumentSerializable : Document
+{
+    public void WriteDocument(Stream stream)
+    {
+        stream.Write(this.Id.ToString());
+        stream.Write(Encoding.UTF8.GetBytes(this.Content));
+    }
+
+    public void ReadDocument(Stream stream)
+    {
+        this.Id = stream.ReadInt();
+        this.Content = stream.ReadString();
+    }
+}
+```
+
+This is of course pseudo-code, but it give's the idea. Let's skip it for now why someone needed custom serialization mechanism (assume that this was for some reason needed) and concentrate on how it was developed. We have inheritance, code is pretty simple, anyone can take care of it, add new property etc. No biggie. So why this is bad design?
+
+First of famous SOLID principles is **Single Responsibility Principle** - one object should have not two, not three but exactly one purpose. In our case `Document` object stores (and manages) some kind of document content. It's the reason this class was introduced. Then we are adding another responsibility to this object - it needs to know how to save and load itself from stream of data. Why? We don't exactly know, but it keeps code in one place so we go with it. Second responsibility isn't that bad after all, it's just one more.
+
+Now see, that if you are going to work with `Document`, you are in fact going to work with `DocumentSerializable` - there is not much point in using plain `Document` since you cannot save it for later. Still you are fine with it, no one needs to know you are working with other type, that's the beauty of inheritance, we can have virtual methods and properties, we can treat those objects like they were plain vanilla `Document`s and no one will notice.
+
+That is until you will need to collaborate with other system for example. Like in this particular case. `Document` had to be shared with other system over which we had no control. This system expected to get `Document`, nothing else. It also expected it in form of XML file. .NET supports XML serialization out of the box, so we don't have much to do - one would think. But such solution failed quickly - serialized object indicated clearly in XML that it is not `Document` but insisted it is `DocumentSerializable` - something target system never heard (nor should have heard) about. So what do we do? Can we force `XmlSerializer` to mark our derived type as base type? Nope, not that I know of - it wouldn't make much sense anyway, would it? I mean - derived type can introduce new fields, properties etc. which base type deserializer wouldn't know how to handle.
+
+So what do we do now? We can write our own Xml serialization mechanism - sure we can. But that's just boring, we will make mistakes along the way, we will need to take care of the code in future, that's no fun at all. We can write another method that would convert `DocumentSerializable` into `Document` - that will be simple, we can even use Reflection to automate this. But that's another responsibility put into this object (with probably complicated business logic, handling documents is never easy). We could think of some other solution - it would work, I'm sure. But see what we're doing now? We are looking for a way to work around, hack, our own design of system to achieve something simple. Doesn't it smell bad?
+
+How could it be done differently? With use of composition of course (or not even composition, those objects could be completely separated). For example:
+
+```csharp
+public class Document
+{
+    public int Id { get; set; }
+    public string Content { get; set; }
+}
+
+public class DocumentSerializable
+{
+    public Document Document { get; set; }
+    public void WriteDocument(Stream stream)
+    {
+        stream.Write(Document.Id.ToString());
+        stream.Write(Encoding.UTF8.GetBytes(Document.Content));
+    }
+
+    public void ReadDocument(Stream stream)
+    {
+        this.Document = new Document()
+        Document.Id = stream.ReadInt();
+        Document.Content = stream.ReadString();
+    }
+}
+```
+
+This way we can have serialization in separate class, but work with `Document` all the time, not having to worry about derived type at any time. Is it huge difference? Looking at this example probably not. But imagine having business logic in there, imagine there are dozens of such types in the system. Suddenly it all starts to be more and more complicated with inheritance, but still easily manageable and testable with composition and following Single Responsibility Principle

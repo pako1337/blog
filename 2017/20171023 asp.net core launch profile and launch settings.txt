@@ -1,0 +1,47 @@
+How to start application in ASP.NET Core from command line?
+
+```
+dotnet run
+```
+
+How to start application in ASP.NET Core in development mode?
+
+```
+set ASPNETCORE_ENVIRONMENT=Development
+dotnet run
+```
+
+How to make it one command? Use launch profile, available in `dotnet run` command. But to make it work, there needs to be `launchSettings.json` file with profile definition, i.e. what needs to be done for application to run.
+
+Definition I am using, inspired by web, is this:
+
+```javascript
+{
+    "iisSettings": {
+        "windowsAuthentication": false,
+        "anonymousAuthentication": true,
+        "iisExpress": {
+        "applicationUrl": "http://localhost:5000/",
+        "sslPort": 0
+        }
+    },
+    "profiles": {
+        "Dev": {
+            "commandName": "Project",
+            "launchBrowser": true,
+            "launchUrl": "http://localhost:5000",
+            "environmentVariables": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        }
+    }
+}
+```
+
+And to launch it in Dev mode all I have to do is:
+
+```
+dotnet run --launch-profile 'Dev'
+```
+
+And... it fails, saying it cannot find this profile. That is because what I did is place the file next to `.csproj` file. Seemed obvious. Well, it should not. Where this file needs to be is in Properties directory (`\Properties\launchSettings.json`). With this layout - it works perfectly fine.

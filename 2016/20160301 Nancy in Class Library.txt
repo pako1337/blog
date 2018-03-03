@@ -1,0 +1,47 @@
+I'm just starting new project (https://github.com/pako1337/raim) and thought about doing it in different technology stack, not usual ASP.NET MVC I'm used to at work. I chose Nancy FX for the moment, and later it should be joined by SignalR. Nothing fancy for now, but I don't need much at this stage.
+
+Setting up Nancy is pretty straightforward, all instructions are available on web (https://github.com/NancyFx/Nancy/wiki/Hosting-nancy-with-owin) and it is just few steps to having Nancy module and returning hello world string. What I want to do differently is - I don't want to use ASP.NET project. I always use it and never bothered to see what's inside of it. It started bothering me some time ago that I have no idea how is it different to normal class library.
+
+First thing first, I have set up new solution and createn new, empty project. In Visual Studio for some reason empty projects are not empty at all - there are bunch of dependencies already included - basic stuff. And there is useless Class1.cs - straight to bin with it!
+
+Next nuget and installing few packages: Nancy, Nancy.Owin and Microsoft.Owin.Host.SystemWeb (which depends on Microsoft.Owin). Easy-peasy. Since we are doing Owin, Startup.cs is nice to have, important to put it in the same namespace as project's default one, otherwise it needs assembly attribute to point to it - but why make life harder if there is nice convention.
+
+[sourcecode="csharp"]
+    public class Startup
+    {
+        public void Configration(IAppBuilder builder)
+        {
+            builder.UseNancy();
+        }
+	}
+```
+
+It doesn't get much easier than that. Owin set up (at the minimum, but still). Now it is time for Nancy module that will handle our requests.
+
+[sourcecode="csharp"]
+    public class HomeModule : NancyModule
+    {
+        public HomeModule()
+        {
+            Get["/"] = parameters => "Welcome to Raim!";
+        }
+    }
+```
+
+Also as simple as it gets. When you get request to application with no parameters and nothing at all in request's path - call this anonymous method to return string. not quite HTML - but will let us know if all is set up. F5 and here we... wait, what? Class library cannot be started directly? Well, yea, Visual Studio won't run class libraries at all.
+
+At first I was sure that it has to be some simple thing. Setting somewhere to tell it it can be started directly, connected to IIS Express (I want it to be my dev server). Looked through properties and found exactly nothing. My google-fu was useless as well. First few pages were of no use, guess no one is doing this the hard way!
+
+My next idea was - create ASP.NET project, diff csproj files and find differences. Did that. At first I noticed nothing strange - few additional references, some files and directories I didn't have. Nothing strange. Then I noticed one line that seemed interesting - <ProjectTypeGuids> entry. And two Guids in it. Decided to copy it over to my csproj (need to use editor outside of VS to do that; or you have to unload the project, edit the file manualy and then reload it). And what do you know - works like a charm! Maybe that is some common knowledge, but I happened to never stumble upon it in my few years as software dev.
+
+```
+...
+<Project>
+	<PropertyGroup>
+		<ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+		...
+```
+
+What is left is double check IIS settings, F5 - yes, please add web.config file, thank you - 403.14 - Forbidden! But why? Shouldn't it be working? Took me a while to realise what is wrong - and I feel silly now, knowing that - project was building into /bin/Debug directory, while IIS was looking into /bin directly. Of course it does, it always did, fool of a Took! Quick change in settings and finally - "Welcome to Raim!" appears on my screen!
+
+Nothing extra fancy yet, but hey! At least now I know that how VS differentiate between web application, console application and simple class library.

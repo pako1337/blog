@@ -1,0 +1,13 @@
+Today it's a quick one. It bite me few times already so it deserves a post, if not to help you, then to make me remember.
+
+Sometimes I write simple test for parameter-less function and then `jasmine-node` sees the test, but do not recognize assertion, reporting something like
+`1 tests, 0 assertions, 0 failures`
+while clearly I have some assertions (a.k.a. expectations) defined! See code below:
+[gist]https://gist.github.com/pako1337/5429859[/gist]
+I'm so used to `CoffeeScript` right now that all seems to be OK for this code. Yet there is an issue in here. `TDD` want's me to write failing test first so it is easy to spot that test passes even though it should not so seeing green test when I expect it to be red indicates that something is wrong). Can you see what's wrong?
+
+`CoffeeScript` allows to call function without using parenthesis - it automatically adds them to include all rest of line as parameters. Pretty nice when used good, code seems clearer, more readable once you get used to it (at least to me, at least now). But here it bites us. You see, when function takes no parameters providing parenthesis to call is obligatory - they won't be added automatically since it would make returning function impossible (or it would require different language feature to return function pointer, which would not be obvious for developers).
+
+Correct code, that actually calls assertsions is presented below:
+[gist]https://gist.github.com/pako1337/5429902[/gist]
+See what changes? Two sets of parenthesis added: one to call `getValue` and the other to `toBeNull` - since both are parameter-less! Now we finally get red test, as expected. Hope I will remember it next time.

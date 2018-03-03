@@ -1,0 +1,27 @@
+I've went through whole optimization process. Getting better and better results at each step, finally reaching the limit when getting 362 times faster than first version of code. That's a lot. Is that a limit? I doubt. We could do few things more at this point. Replacing property calls with private field should give a little bit more performance. Investigating algorithms more deeply may uncover some more optimizations.
+
+Is that needed? At that point to me - no. I've been testing it under pretty stressful conditions - small area packed with 1000 triangles means a lot of collisions happening. Changing area size to 10 000 x 10 000 gives serial collision check time at 2ms level. Leave area size 1000 x 1000 and limit triangle number to 500 and time is as low as 2ms as well. And it's still probably way more collisions going on per frame than in usual 2D game where we either don't check for collisions against objects close to each other (player vs. floor) or objects are usually not colliding (player vs. wall or vs. player).
+
+How does the data look?
+
+<table>
+<tr><td>change</td><td>collisions serial</td><td>time serial</td><td>collisions parallel</td><td>time parallel</td></tr>
+<tr><td>initial</td><td>8058</td><td>1814</td><td>8058</td><td>562</td></tr>
+<tr><td>line segments initialized</td><td>8058</td><td>1061</td><td>8058</td><td>308</td></tr>
+<tr><td>bounding boxes</td><td>8058</td><td>25</td><td>8058</td><td>7</td></tr>
+<tr><td>quad tree basic</td><td>7054</td><td>30</td><td>7054</td><td>10</td></tr>
+<tr><td>_allChildren added</td><td>7054</td><td>25</td><td>7054</td><td>7</td></tr>
+<tr><td>two segments check</td><td>6685</td><td>19</td><td>6685</td><td>7</td></tr>
+<tr><td>rectangle optimization</td><td>6685</td><td>19</td><td>6685</td><td>7</td></tr>
+<tr><td>line precalculations</td><td> 6685</td><td>18</td><td>6685</td><td>7</td></tr>
+<tr><td>triangle contains linq replacement</td><td>6685</td><td>13</td><td>6685</td><td>4</td></tr>
+<tr><td>QuadTree collison check</td><td>3163</td><td>5</td><td>3163</td><td>3</td></tr>
+</table>
+
+As you can see collisions detected over time decreased as I've made the code more precise at the same time improving performance.
+
+What's to learn from this exercise? First - performance often comes with the price. You can do some things faster, but you will need to pay the price in memory usage (when precalculatig some values), code readability (when replacing LINQ with code duplications, however one could argue if resulted code was harder to read in this particular case) or time take to rewrite the code (changing simple list and replacing it with more complex Quad Tree).
+
+Also - but that's pretty common knowledge - there is no point in doing performance improvements without profiler set up. You may get better results, you may not, but you will only be guessing without something that will measure your code's performance.
+
+And final thought - many times there are complains that C# and Java are slow. Well, I'm pretty sure those collisions written in C or C++ would be faster. But would it make that much of a difference? I don't think so, at least not in my case. For some applications it can be critical to get code running as fast as possible, for others 2ms is fast enough. And tool you know will serve you better at that point than tool you are not that experienced with.

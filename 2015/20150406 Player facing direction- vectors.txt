@@ -1,0 +1,56 @@
+With mouse input handled, I can start making sense of this information. What I want is to know which direction player is facing. This may be useful to calculate which direction shot is fired or maybe what player can or cannot see.
+
+First thing I need is to know where is player exactly - compared to mouse pointer. Luckly player knows position where he or she is. Mouse pointer position is also available so vector from player to mouse pointer can be built.
+
+```javascript
+var mouseChange = function (mouse) {
+	var p = players.get(playerName);
+	var vector = { x: mouse.x - p.Position.X, y: mouse.y - p.Position.Y };
+};
+```
+
+Ok, got vector. Now what? Vector is not a direction in which player looks. I was thinking more like an angle or something. Stuff I can use in calculations. Ok, so what I really want is an angle between X axis and player direction vector. Thankfully math knows how to do this!
+
+What I need is dot product of two vectors. Result of dot product operation is, well, product of both vector lengths and cosine of angle between them:
+
+```
+dotProduct(dirVector, xAxisVector) = len(dirVector) * len(xAxisVector) * cos(angle)
+```
+
+If I get my vectors to be of length 1 - the right side of equation will be greatly simplified to sime cosine value. Vectors with length of 1 are known as unit vector. My direction vector can be turned into unit by simply scaling `x` and `y` parts by vector's original length:
+
+```
+dirVector.X = dirVector.X / len(dirVector);
+dirVector.Y = dirVector.Y / len(dirVector);
+```
+
+Mixing it all up I got:
+
+```
+var mouseChange = function (mouse) {
+	var p = players.get(playerName);
+
+	var vector = { x: mouse.x - p.Position.X, y: mouse.y - p.Position.Y };
+	var vectorLength = vector.x * vector.x + vector.y * vector.y;
+	vectorLength = Math.sqrt(vectorLength);
+	vector.x = vector.x / vectorLength;
+	vector.y = vector.y / vectorLength;
+	var screenVector = { x: 1, y: 0};
+
+	var dotProduct = vector.x * screenVector.x + vector.y * screenVector.y;
+};
+```
+
+Screen vector was easy to build - I want it to align with X axis and have a length of one, so (1, 0) is perfect vector for this. `dotProduct` now holds cosine of angle. How to get angle from cosine? Using arc cosine of course - function that gives angle for given cosine value.
+
+```javascript
+var mouseChange = function (mouse) {
+	// as before
+
+	var dotProduct = vector.x * screenVector.x + vector.y * screenVector.y;
+	var angle = Math.acos(dotProduct);
+	console.log(angle);
+};
+```
+
+Logged to console will be angle between player and mouse pointer - angle at which player is looking. The values are goning to be between 0 and 2Pi, 0 being aligned with X axis (pointing to right), Pi being directed in X axis too, but pointing to left. Pi/2 and 3Pi/2 are point upwards and downwards respectively.

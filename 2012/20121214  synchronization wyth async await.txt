@@ -1,0 +1,4 @@
+Do you always want to block whole thread waiting for some resources? Probably not. Why not benefit from `async/await` constructs available in .NET 4.5? But you cannot simply await for `ManualResetEvent` or `Semaphore`. Here comes great series of posts by Stephen Toub on how to implement async-enabled synchronization mechanisms.  
+It starts with `ManualResetEvent`, and then continuous for total of 7 blog posts. Must-read for all `async/await` fans out there.  
+Just start from <a title="http://blogs.msdn.com/b/pfxteam/archive/2012/02/11/10266920.aspx" href="http://blogs.msdn.com/b/pfxteam/archive/2012/02/11/10266920.aspx">http://blogs.msdn.com/b/pfxteam/archive/2012/02/11/10266920.aspx</a> and move forward.  
+Have fun!

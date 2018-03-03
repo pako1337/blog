@@ -1,0 +1,55 @@
+One useful info in any game that promotes rivalry of any kind is score each player gets. How else do you decide who is actualy better? In Raim, stuff is pretty simple - you get one point for any other player you hit with your bullet. Clear rules are the best.
+
+Actual implementation? Well, that's a simple one this time:
+
+```csharp
+private void HandleCollision(Player o1, Bullet o2)
+{
+	o1.IsDestroyed = true;
+	o2.IsDestroyed = true;
+	o2.KilledPlayer();
+}
+```
+
+```csharp
+public void KilledPlayer()
+{
+	Player.KilledEnemy();
+}
+```
+
+```csharp
+public void KilledEnemy()
+{
+	Score++;
+}
+```
+
+Bullet knows what to do in case it hit the other player. This time it only notifies player it belongs to that something like that happened so player can update internal score. In future maybe this will do something more.
+
+Score is property of player so it will notify all players when the next update from server will be sent to clients. And what clients should do is to update leaderboard.
+
+```javascript
+var playerMoved = function (gameObjectsFromServer) {
+	gameObjects = gameObjectsFromServer;
+	players.updateLeaderboard(gameObjects);
+};
+```
+
+```javascript
+var updateLeaderboard = function (gameObjects) {
+	for (var i = 0; i < _players.length; i++) {
+		_players[i] = gameObjects.find(function (g) { return g.Id == _players[i].Id; });
+		var playersList = document.getElementById(playersListElementId);
+		var playerListElement = playersList.getElementsByTagName("span")[i];
+		playerListElement.textContent = _players[i].Name + " " + _players[i].Score;
+		playerListElement.id = _players[i].Id;
+	}
+
+	for (var i = _player.length; i < playerListElements.length; i++) {
+		playersList.removeChild(playerListElements[i]);
+	}
+};
+```
+
+That is one ugly piece of code, but it will do for now :)

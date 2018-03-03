@@ -1,0 +1,151 @@
+OK, time to do some changes. I would really hate it if I had to write different loops for every possible object type. One loop to rule them all. One loop to draw them.
+
+I've already extracted `IGameObject` interface with some common stuff I (at this point) think all objects will use. That is:
+
+```csharp
+public interface IGameObject
+{
+	Guid Id { get; }
+	Vector2d Position { get; }
+	Vector2d Speed { get; }
+	Vector2d FacingDirection { get; }
+
+	void Update(DateTime updateTime);
+}
+```
+
+Then I changed how hub manages objects:
+
+```csharp
+public class RaimHub : Hub
+{
+	private static Dictionary<string, Player> players = new Dictionary<string, Player>();
+	private static List<IGameObject> gameObjects = new List<IGameObject>();
+
+	public void Register(string name)
+	{
+		name = HttpUtility.HtmlEncode(name);
+		var player = Player.Create(name, 250, 250);
+		players.Add(Context.ConnectionId, player);
+		gameObjects.Add(player);
+		Clients.All.Registered(player);
+		Clients.Caller.OtherPlayers(players.Values.Where(p => p.Name != name));
+
+		UpdateGameState();
+		Clients.All.PlayerMoved(gameObjects);
+	}
+
+	public void SignOff()
+	{
+		...
+
+		UpdateGameState();
+		Clients.All.PlayerMoved(gameObjects);
+	}
+
+	public override Task OnDisconnected(bool stopCalled)
+	{
+		SignOff();
+		return base.OnDisconnected(stopCalled);
+	}
+
+	public void PlayerMoving(PlayerInput input)
+	{
+		UpdateGameState();
+		var player = players[Context.ConnectionId];
+		var createdObjects = player.ProcessInput(input);
+		gameObjects.AddRange(createdObjects);
+		Clients.All.PlayerMoved(gameObjects);
+	}
+
+	private void UpdateGameState()
+	{
+		var updateTime = DateTime.Now;
+
+		foreach (var player in gameObjects)
+			player.Update(updateTime);
+	}
+}
+```
+
+So now any action that comes to server causes objects to be updated and sent back to all players to synchronise their status. This piece of code I'm positive will change, but servers its purpose for now.
+
+It also requires some changes on client side. First at `arena.js`
+
+```javascript
+var playerMoved = function (gameObjectsFromServer) {
+	gameObjects = gameObjectsFromServer;
+};
+
+	var processFrame = function (timestamp) {
+	if (!lastFrameTime)
+		lastFrameTime = timestamp;
+	
+	var timeDiff = (timestamp - lastFrameTime) / 1000;
+
+	for (var i = 0; i < gameObjects.length; i++) {
+		var player = gameObjects[i];
+
+		var directionPoint = { x: player.Position.X + player.FacingDirection.X, y: player.Position.Y + player.FacingDirection.Y };
+		player.Position.X += player.Speed.X * timeDiff;
+		player.Position.Y += player.Speed.Y * timeDiff;
+		player.FacingDirection = calculateFacingDirection(player, directionPoint);
+	}
+
+	gfx.drawArena(gameObjects);
+
+	lastFrameTime = timestamp;
+	requestAnimationFrame(processFrame);
+};
+```
+
+And then at `raimGraphics.js`
+
+```javascript
+var drawArena = function (gameObjects) {
+	drawingContext.clearRect(0, 0, canvas.width, canvas.height);
+
+	for (var i = 0; i < gameObjects.length; i++) {
+		var gameObject = gameObjects[i];
+		if (gameObject.Name === undefined) {
+			drawBullet(gameObject);
+		} else {
+			drawPlayer(gameObject);
+		}
+	}
+};
+```
+
+Don't shoot for this ugly if. Right now Name is only available for players, not for other objects so it can be used to differentiate between object types. But I will implement object types for sure!
+
+There, now it makes things bit easier to handle on client and server.
+
+Lets go back to handling user input. Last implementation of mouse click was working only when mouse was moving - that's the only time `mousemove` is triggered of course. That's not acceptable for shooting though. New, upgraded code looks like this:
+
+```javascript
+function mouseDown(e) {
+	if ((e.buttons && 1) && (keys.indexOf(1) === -1)) {
+		keys.push(1);
+	}
+	notifyKeysChanged();
+}
+
+function mouseUp(e) {
+	if (keys.indexOf(1) >= 0) {
+		keys.splice(keys.indexOf(1), 1);
+	}
+	notifyKeysChanged();
+}
+
+(function () {
+	document.addEventListener("keydown", keyDown);
+	document.addEventListener("keyup", keyUp);
+	document.addEventListener("mousemove", mouseMove);
+	document.addEventListener("mousedown", mouseDown);
+	document.addEventListener("mouseup", mouseUp);
+})();
+```
+
+So mouse clicks are handled separately to all other moving logic, giving quick response and appropriate behavior.
+
+Am I done with mouse input for now? Sure not. User can trigger so many shots one after another that he or she can fill up the screen with black dots. This is problem for game as well as for performance. I'll need to handle that next.

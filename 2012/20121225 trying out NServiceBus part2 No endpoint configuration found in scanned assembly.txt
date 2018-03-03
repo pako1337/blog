@@ -1,0 +1,17 @@
+In <a href="http://jporwol.wordpress.com/2012/12/22/trying-out-nservicebus/" title="Trying out NServiceBus">previous</a> post I've shown how I have set up my testing environment to have some fun with NServiceBus. In the end everything seemed to be OK, yet while trying to start the application exception has been thrown saying that no endpoint configuration has been found, even though I've created one.
+
+First I googled my issue trying to find out what's going on and immediately I've found this thread on Stack Overflow: <a href="http://stackoverflow.com/questions/6095043/the-dreaded-no-endpoint-configuration-found-in-scanned-assemblies-nservicebus" title="The dreaded “No endpoint configuration found in scanned assemblies” NServiceBus error" target="_blank">The dreaded “No endpoint configuration found in scanned assemblies” NServiceBus error</a>. As the answer to the question states, this exception can be thrown in numerous situations, leaving to developer to find out which reason is the actual one in each case.
+
+After confirming that my assembly .NET version and NServiceBus target versions are the same (.NET 4.0 in my case) I decided to follow hint provided by exception and the SO answer: create `NServiceBus.Host.exe.config` file and explicitly point which class should be used for configuration. The file content is simple:
+[gist]http://gist.github.com/4360104[/gist]
+The same file (with value changed to `nServiceBusFun.EndpointConfig, nServiceBusFun`) was created in publisher project. The value is simply `namespace.className, assemblyName`.
+
+And this in fact did solve the issue from topic. But it introduced another one: `BadImageFormatException`. But hey! We are one step closer!
+Quick googling on this exception with NServiceBus led me to this page:<a href="http://blog.jonathanoliver.com/2011/03/new-nservicebus-feature-32-bit-x86-host-process/" title="New NServiceBus Feature: 32-bit (x86) Host Process" target="_blank">New NServiceBus Feature: 32-bit (x86) Host Process</a> explaining why this exception has been thrown. Since I'm working on 64-bit system NServiceBus tries to load x64 assemblies. However by default my libraries were set to x86 mode. So I've changed them to `Any CPU` mode to make sure they are correctly working with x64 libraries.
+And <a href="http://en.wiktionary.org/wiki/voil%C3%A0" title="Voila" target="_blank">Voila</a>! Mailer works, it started correctly and after few seconds NServiceBus reported that queue was created and application was waiting for messages to come.
+
+But this left me with `nServiceBusFun` project, which I've also fixed, but now it started throwing exception saying that *.vhost.exe file cannot be loaded, and also giving a hint about how to fix this.
+`Exception when starting endpoint, error has been logged. Reason: Could not load C:\Users\Pako\documents\visual studio 2010\Projects\nServiceBusFun\nServiceBusFun\bin\Debug\nServiceBusFun.vshost.exe. Consider using 'Configure.With(AllAssemblies.Except("nServiceBusFun.vshost.exe"))' to tell NServiceBus not to load this file.`
+So I've updated my configuration file to implement `IWantCustomInitialization` interface which will give us possibility to modify configuration in code. So now the file looks like this:
+[gist]http://gist.github.com/4360195[/gist]
+which is exactly like exception said it should be. Great! Now it starts correctly, configures everything successfully and tries to send a message. But the message is not always delivered. Why? I will discuss it in my next blog post in this series.

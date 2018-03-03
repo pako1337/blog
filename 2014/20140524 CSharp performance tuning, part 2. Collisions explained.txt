@@ -1,0 +1,15 @@
+So how do we know if our triangle intersects with another one? It is pretty obvious - either their sides intersects or one triangle is inside the other. No other way around it. But how are we checking this? Let's start from checking if two lines are intersecting.
+
+We are trying to get point in which both lines will intersect. I'll be honest here - I've just found this algorithm somewhere on the internet (to be exact - here: http://thirdpartyninjas.com/blog/2008/10/07/line-segment-intersection/), as I didn't want to bother to much with maths here and get to code. Tests I wrote proved to me that it works. To get intersection point, we are calculating two nominators and one, common to both fractions, denominator. Logic is as follows: if denominator is zero, lines are parallel. If both numerators are also zero - lines are effectively the same, one is on top of the other if you will. In other cases, we calculate the fraction to get intersection point parameter value. If both those parameters are between 0 and 1 - we have intersections. If they are outside of this range - lines are colliding, but not within our segments of line, which is what we are interested in.
+
+Now we can move onto triangles. As I said before - we need to have either triangle sides colliding, or one triangle needs to be inside of the other. Since we have line collision detection in place, checking sides is as simple as checking each side against sides of the other triangle. That gives us 9 checks at most. If we fail to detect collision here, we try to see if any point from triangle A is inside triangle B and vice versa.
+
+To see if point is inside a triangle, we use power of internet again - and StackOverflow is always helpful. https://stackoverflow.com/questions/2049582/how-to-determine-a-point-in-a-triangle is great answer that gives us exactly what we need - and again, tests proves that this solution is correct. What do we do? Three points in triangle, checked against three sides of the other one (A inside B) and again (B inside A detection) will cost us 18 checks in worst case.
+
+And how do we detect collisions between all those objects? Simply enough - we iterate over all objects in collection and check collision against every other object there. Or we do that in parallel to get some performance boost.
+
+How do initial values look like? Well, not too good unfortunately. We got 8058 collisions detected but it took 1814ms for serial code and 562ms for parallel version. So in best case we can get not even two full checks in a second. That's slow!
+
+And final words before we get into optimization. Those values I give you are from Release compiled version. Debug if few times slower and is no good for us. Also - running it from Visual Studio will give you slower times, probably due to VS trying to debug code. So I run if from bin/Release folder directly.
+
+And test machine: my few years old PC with Intel i5 2500k on board @3.3.GHz on each of its 4 cores. 8GB of RAM.

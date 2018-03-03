@@ -1,0 +1,75 @@
+Imagine that, while working in jQuery and javascript, you want to trigger one task and once it is finished you want to trigger another one. You might come up with something like this:
+
+```javascript
+var d1 = $.Deferred();
+var d2 = $.Deferred();
+
+d2.done(function() { console.log("d2 done")});
+
+d1.done(function() { console.log("d1 done")})
+.done(function () {
+      setTimeout(function () {
+        d2.resolve();
+      }, 1000);
+      return d2;
+  })
+  .done(function () {console.log("both done")});
+  
+console.log("start");
+d1.resolve();
+```
+
+[jsfiddle.net/bLh9eo2f/](https://jsfiddle.net/bLh9eo2f/ "jsfiddle.net/bLh9eo2f/")
+
+Timeout in d2 resolving is just to simulate time taking task. And expected output would be like:
+
+```
+start
+d1 done
+d2 done
+both done
+```
+
+However if you run it you will get something different
+
+```
+start
+d1 done
+both done
+d2 done
+```
+
+Race condition? Not at all, something entirely different - invalid use of promises. You see, `done` and `then` may sound similar but do something completely different. `Done` is used to callback some code once promise is done. `Then` is used to chain promises - it will be triggered once first promise is done and it will return entirely new promise.
+
+Code above uses done incorrectly - when `d1` is finished it calls first done, triggering `d2` processing, but then immediately calls `both done` callback - `done` returns original promise to which it was applied, and since it was finished, all done callbacks are going to be called. Correct solution is as follows:
+
+```javascript
+var d1 = $.Deferred();
+var d2 = $.Deferred();
+
+d2.done(function() { console.log("d2 done")});
+d1.done(function() { console.log("d1 done")})
+  .then(function () {
+      setTimeout(function () {
+        d2.resolve();
+      }, 1000);
+      return d2;
+  })
+  .done(function () {console.log("both done")});
+  
+console.log("start");
+d1.resolve();
+```
+
+[jsfiddle.net/ttuLmwxq/1/](https://jsfiddle.net/ttuLmwxq/1/ "jsfiddle.net/ttuLmwxq/1/")
+
+producing output:
+
+```
+start
+d1 done
+d2 done
+both done
+```
+
+As expected. And imagine what would happen if `d2` failed to finish correctly? In first case - system would report that both were done ok. In second, it would report that `d1` finished, true, but later would fail on `d2` and since then all callbacks would only be triggered for `fail` case.

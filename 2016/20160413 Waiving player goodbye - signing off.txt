@@ -1,0 +1,45 @@
+Feature that's missing in Raim is - once player gets into game he or she cannot go out. Well, technically - he/she can, by closing the page or navigating to different page. But other players won't know since they will not get any info. And figuring it out just because player hasn't moved for past ten minutes does not work great as user experience goes.
+
+Solution is simple: notify all players that player has signed off, moved to do something less fun than play this awesome game. Once chance to do that is to subscribe to `beforeunload` event of browser window. Once the event is raised page can potentially ask viewer to stay on the page a while longer (which most of the time makes people more angry than happy; that's why it can be blocked by browser so don't count on it working). I don't want player to stay longer that way - I want to notify other players that there is one less person to play against.
+
+```javascript
+(function () {
+    var raim = $.connection.raimHub;
+	
+    raim.client.signedOff = gameArena.removePlayer;
+
+    function signOff() {
+        console.log("unloading");
+        raim.server.signOff(name);
+    }
+
+    $.connection.hub.start().done(function () {
+        var name = Date.now().toString();
+        raim.server.register(name);
+        gameArena.setPlayer(name);
+
+        window.addEventListener("beforeunload", signOff);
+    });
+})();
+```
+
+And passing info that player signed off to players list:
+
+```javascript
+var removePlayer = function (player) {
+	var playerIndex = _players.findIndex(function (p) { return p.Name === player; });
+	_players.splice(playerIndex, 1);
+}
+```
+
+Of course there is server handling missing, from `RaimHub.cs`:
+
+```csharp
+public void SignOff(string name)
+{
+	players.Remove(Context.ConnectionId);
+	Clients.All.SignedOff(name);
+}
+```
+
+And this way if player goes to different page everyone will get notified and player will disappear from game screen.

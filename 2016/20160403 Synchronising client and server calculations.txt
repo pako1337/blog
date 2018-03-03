@@ -1,0 +1,23 @@
+Synchronising with server will be an important part of the project. Most of the calculations will have to be duplicated: client and server will both get their own values. Client to get quickest possible response to user, avoiding lags in input. Server to prevent users from cheating and serve as single source of truth. At this point there are two things that require syncing: position and speed. Speed is in fact already done - any time user presses a key, message is sent to server and response is obtained by all co-players. Position is trickier since the time has passed and position needs to be updated very frequently. I've put simple code to calculate new position in every frame, but server is not aware of this. Time to change that.
+
+```csharp
+public class Player
+{
+	private DateTime lastUpdate = DateTime.Now;
+
+	public void ChangeSpeed(MoveDirection direction)
+	{
+		var changeTime = DateTime.Now;
+		var timeBetweenEvents = changeTime - lastUpdate;
+
+		Position.X += (int)(Speed.X * timeBetweenEvents.TotalSeconds);
+		Position.Y += (int)(Speed.Y * timeBetweenEvents.TotalSeconds);
+
+		lastUpdate = changeTime;
+
+		// as it was befre
+	}
+}
+```
+
+As can be seen above - once player's object is created, its update time will be initialized. After that, every time some player event will be processed (at this point there is only one such event), position will get updated. After speed change, player object is sent back to all players and they are updating both the speed and positions of the players inside game arena, effectively overriding any client side calculations. Should anyone try to chat, change position of player or something, every event from server will reset those values to the same state they are on server - achieving single source of truth.

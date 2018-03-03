@@ -1,0 +1,17 @@
+Agile. Lean. Extreme Programming. Yadda yadda yadda. Over and over again. Day after day.
+
+The thing is, business likes to think agile is whatever suits them at the moment. Be it changes in requirements every week, lack of proper testing or defined process of work. Or lack of documentation. Why would you need one? Code is self documenting. We have power point presentations. We have sharepoint!
+
+But at one point you are going to work with one, huge environment. Different applications. Most of which you have never heard about. And someone reports a bug. Data in system Ypsilon is incorrect! Fix it ASAP!
+
+I took my time trying to figure out what is this Ypsilon unicorn I've never seen before. No idea. Called few guys, got some answers but nothing that would put me any closer to fix. But I knew that Alpha system I was working with most of the time was producing csv file with data (yup, 21st century and we're still sharing data using csv with bad formatting and FTP). But the code there wasn't touched in 3 years. So how it suddenly broke when October started?
+
+But everyone was convinced that Alpha system was broken. Fun part was when they were telling me what data was expected in file. "Column A needs to have 111!". Next day: "Column A needs to have 543!". Later: "Column A needs to be 111! Don't change it!". They didn't know themselves.
+
+Week passed when they were trying to figure out what's wrong with data in the first place and what's the real error they are experiencing. Today few guys finally sit down, looked at the data they are getting, looked at few systems and figured: it's not Aplha's fault! It's Gamma that's wrong! Yup, you got it. I barely knew Gamma system exists, even less what it does.
+
+How could this time be saved? With documentation. First - global architecture of the system. What systems are working together. How they are sharing data. WHAT they are sharing. Second - documentation of interfaces. If system produces output that's being consumed by other systems it needs to be documented well. We can't leave it to code. Code changes. Not everyone has access to code of every system. This leads to other developers making assumptions based on names of columns (if those are named in the first place) which can be misleading. And those assumptions may be based on small subset of data and not right in long game.
+
+Have we had documentation finding bug could take one day. Not seven. Or we could not have bug in first place.
+
+Lack of documentation is not agile. It is just stupid.

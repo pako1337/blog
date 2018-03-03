@@ -1,0 +1,27 @@
+Since the player registered and other players got his name back, it would be useful to show it to them. I imagine it can be useful to have list of players (or at least subset of them, leaderbord or something?) available. All the data is readily available so I threw a div onto page and wrote this great piece of code:
+
+```javascript
+raim.client.registered = function (who) {
+    var players = document.getElementById('playersList');
+    var playerNameElement = document.createElement('span');
+    playerNameElement.textContent = who;
+    players.appendChild(playerNameElement);
+};
+```
+
+Notice I try not to use jQuery. I want to see how far I can get without it (of course it is still there, SignalR depends on it), but mainly - I am a bit curious how far did browsers get with supporting the same flavour of javascript everywhere, how many differences are still there. How did they upped the game - now that javascript is only getting more popular. Also performance might be a reason to ditch jQuery, but I think I am very far from it - but if that was advanced game, I imagine going closer to the metal gives one more opportunities to optimize everything.
+
+Next thing to notice is `document.createElement`. I've seen a lot of times when developers just modify `innerHtml` of an element. Append to the string, throw in few variables here and there. Heck - I've done it myself so many times. Not a good practice, that's for sure. Hard to maintain, easy to throw in few bugs (unclosed elements). Why not depend on browser to manage DOM tree correctly - I can only assume it is extremely good at it. So I'll let it create my element and append it to the list of elements already in the list.  
+And also I would expect it to perform better in some conditions, like when there are already quite a few elements - modifying `innerHtml` text will throw all those elements away and create new one, basically recreating whole tree node. Appending new element in the end will preserve all existing nodes and just throw a new one to the end.
+
+And now spot the mistake. It is there, and it is big. Got it?
+
+If the `innerHtml` is modified, content gets injected into page. And what if the player's name is, by some coincidence `<img src=x onerror="alert(1)"></script>`? Try it in browser's console window, modifying `innerHtml`. And if that wasn't just harmless alert window? Let me just remind you of [link](https://xkcd.com/327/ "little Bobby's story"). It wasn't yet decided whether humanity is great or, well, not quite so good at all. So why take the risk? Also - always sanitize users' inputs!
+
+```csharp
+public void Register(string name)
+{
+	name = HttpUtility.HtmlEncode(name);
+	...
+}
+```

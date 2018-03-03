@@ -1,0 +1,204 @@
+I was wondering how fast can I make C# code. Well, I knew it can be pretty fast, probably not as fast as C or C++ since it is managed language, JIT compiled etc., but still - how much can I squeeze from it?
+
+So why not have some fun and code something simple, yet performance sensitive at the same time? Like collision detection engine? Those definitely need to be fast if you want to have any decent frame rate in your games. To get 60fps you have 16ms to prepare each frame. And that's not just collision detection, it is also drawing graphics, updating objects and so on. So each small part must be as fast as possible.
+
+I'm limiting myself to triangle collision detection. All game shapes can be approximated by number of triangles. More you have - better shape representation you will have, but more complex collision detection you may end up with.
+
+So here we are, few classes down the road, just the basics. Point, Line, Triangle. Minimal set of methods to detect collision (plus tests of course, but those I will skip here). Check the code below.
+
+Point.cs
+
+```csharp
+    public struct Point
+    {
+        public int X { get; private set; }
+        public int Y { get; private set; }
+
+        public Point(int x, int y) : this()
+        {
+            X = x;
+            Y = y;
+        }
+    }
+```
+
+Line.cs
+
+```csharp
+    public class Line
+    {
+        public Point Start { get; private set; }
+        public Point End   { get; private set; }
+
+        public Line(Point start, Point end)
+        {
+            Start = start;
+            End = end;
+        }
+
+        public static Line Create(int x1, int y1, int x2, int y2)
+        {
+            return new Line(new Point(x1, y1), new Point(x2, y2));
+        }
+
+        public bool Intersects(Line b)
+        {
+            double denominator = (b.End.Y - b.Start.Y) * (End.X - Start.X) - (b.End.X - b.Start.X) * (End.Y - Start.Y);
+            double aNumerator = (b.End.X - b.Start.X) * (Start.Y - b.Start.Y) - (b.End.Y - b.Start.Y) * (Start.X - b.Start.X);
+            double bNumerator = (End.X - Start.X) * (Start.Y - b.Start.Y) - (End.Y - Start.Y) * (Start.X - b.Start.X);
+
+            if (denominator.IsZero())
+                return aNumerator.IsZero() && bNumerator.IsZero();
+
+            double aParameter = aNumerator / denominator;
+            double bParameter = bNumerator / denominator;
+
+            return aParameter > 0 && aParameter <= 1 &&
+                   bParameter > 0 && bParameter <= 1;
+        }
+
+        public double Sign(Point point)
+        {
+            return (Start.Y - End.Y) * (point.X - End.X) - (Start.X - End.X) * (point.Y - End.Y);
+        }
+    }
+
+    public static class DoubleExtension
+    {
+        internal static bool IsZero(this double denominator)
+        {
+            const double epsilon = 0.000001;
+            return Math.Abs(denominator) < epsilon;
+        }
+    }
+```
+
+Triangle.cs
+
+```csharp
+    public class Triangle
+    {
+        public Point A { get; private set; }
+        public Point B { get; private set; }
+        public Point C { get; private set; }
+                
+        public Triangle(Point a, Point b, Point c)
+        {
+            A = a;
+            B = b;
+            C = c;
+        }
+
+        public bool Intersects(Triangle b)
+        {
+            return SegmentsAreCrossing(b) || OneIsInsideTheOther(b);
+        }
+
+        private bool SegmentsAreCrossing(Triangle b)
+        {
+            return GetSegments().Any(sa => b.GetSegments().Any(sb => sa.Intersects(sb)));
+        }
+
+        private bool OneIsInsideTheOther(Triangle b)
+        {
+            bool oneInsideOther =
+                Contains(b.A) || Contains(b.B) || Contains(b.C) ||
+                b.Contains(A) || b.Contains(B) || b.Contains(C);
+            return oneInsideOther;
+        }
+
+        private bool Contains(Point point)
+        {
+            return GetSegments().All(s => s.Sign(point) < 0);
+        }
+
+        private List<Line> GetSegments()
+        {
+            return new List<Line>
+            {
+                new Line(A, B),
+                new Line(B, C),
+                new Line(C, A)
+            };
+        }
+    }
+```
+
+And simple program to trigger those collision detections. I've decided to work with 1000 x 1000 area and put there 1000 triangles. It gives tightly packed set of triangles, lots of collisions going on there for sure. There is also parallel implementation of this collision detection, just to see how much we can squeeze out of our multi-core processors. As you can see I'm randomizing triangles, trying not to make them to big, but starting with the same seed always - 0 that is. This way each run will generate exactly the same set of triangles so our micro benchmarks will be consistent.
+
+Program.cs
+
+```csharp
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            const int screenWidth = 1000;
+            const int screenHeight = 1000;
+            var rand = new Random(0);
+            var triangles = new List<Triangle>();
+
+            for (int i = 0; i < 1000; i++)
+            {
+                var a = new Point(rand.Next(0, screenWidth), rand.Next(0, screenHeight));
+                var b = new Point(a.X + rand.Next(0, 100), a.Y + rand.Next(0, 100));
+                var c = new Point(a.X + rand.Next(0, 100), a.Y + rand.Next(0, 100));
+                triangles.Add(new Triangle(a, b, c));
+            }
+
+            Collisions(triangles);
+            CollisionsParallel(triangles);
+
+            Console.ReadKey();
+        }
+
+        private static void Collisions(List<Triangle> triangles)
+        {
+            Stopwatch watch;
+            int collisions;
+            watch = new Stopwatch();
+
+            watch.Start();
+            collisions = 0;
+            for (int i = 0; i < triangles.Count; i++)
+            {
+                Triangle triangle = triangles[i];
+                collisions += CheckCollisions(triangles, triangle);
+            }
+            watch.Stop();
+            Console.WriteLine("Collisions: {0}\t time: {1}", collisions, watch.ElapsedMilliseconds);
+        }
+
+        private static int CollisionsParallel(List<Triangle> triangles)
+        {
+            Stopwatch watch;
+            int collisions;
+            watch = new Stopwatch();
+
+            watch.Start();
+            collisions = 0;
+            Parallel.For(0, triangles.Count,
+                i =>
+                {
+                    Triangle triangle = triangles[i];
+                    int coll = CheckCollisions(triangles, triangle);
+                    Interlocked.Add(ref collisions, coll);
+                });
+            watch.Stop();
+            Console.WriteLine("Collisions: {0}\t time: {1}", collisions, watch.ElapsedMilliseconds);
+            return collisions;
+        }
+
+        private static int CheckCollisions(List<Triangle> triangles, Triangle triangle)
+        {
+            int collisions = 0;
+            for (int j = 0; j < triangles.Count; j++)
+                if (triangle.Intersects(triangles[j]))
+                    ++collisions;
+
+            return collisions;
+        }
+    }
+```
+	
+In next post I will cover how collisions are detected in the first place before we will get to any optimization.

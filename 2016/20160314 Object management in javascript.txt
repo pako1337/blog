@@ -1,0 +1,52 @@
+It is quite logical to expect hub code both on server and client side to get bigger and more complex as development progresses. Also, having multiple functionalities covered by a single file is not clear, can be nest of bugs etc. Look at your code base, get some stats - if you see some files being edited over and over again - that's where your most serious problems probably are and investing some time to get this situation under control will pay of.
+
+One operation that is pretty much separate form the rest is adding player to players list. It needs a name and can operate on DOM tree by itself. Moving it to separate file is easy enough:
+
+```javascript
+function PlayersList() {
+	var playersListElementId = 'playersList';
+	
+	var addNewPlayer = function (player) {
+		var players = document.getElementById(playersListElementId);
+		var playerNameElement = document.createElement('span');
+		playerNameElement.textContent = player;
+		players.appendChild(playerNameElement);
+	};
+
+	return {
+		addNewPlayer: addNewPlayer
+	};
+}
+```
+
+Instead of extracting just a function, I've decided to create small object that can handle players list management. It has one field with name of DOM element in which players should be listed, as well as one function to add new player to said list. Standard javascript structure with private function and returning object structure which will expose this function to public thanks to beauty of closures.
+
+That seems quite good, doesn't it? Well, there are some problems though. It uses hardcoded id of element. It would be nice to be able to pass it from outside if I decide to change its name. Leveled up version is:
+
+```javascript
+function PlayersList(args) {
+    args = args || {};
+    var playersListElementId = args.playersList || 'playersList';
+
+    var addNewPlayer = function (player) {
+        var players = document.getElementById(playersListElementId);
+        var playerNameElement = document.createElement('span');
+        playerNameElement.textContent = player.Name;
+        players.appendChild(playerNameElement);
+    };
+
+    return {
+        addNewPlayer: addNewPlayer
+    };
+}
+```
+
+To constructor function there can be passed args parameter - an object holding any values `PlayersList` might want to use. If it is empty, it's going to be initialized with empty object. And if there is no player list id in args, code will fall back to default id. All of this thanks to the way javascript works.
+
+There are true and false values in computer programming. Javascript also has truthy and falsy values - those that are evaluated to true and false respectively, when used in logical expression. One of falsy values is undefined. And when parameter is defined (or any variable for that matter) and no value is assigned to it, it is undefined.  
+Second part of solution is `||` operator. That's a logica or. If at least one of its sides is true (or truthy) - it is going to be evaluated to true. But double pipes `||` also have neat optimization in it - if left part of expression is evaluated to be truth(y) - right part does not have to be evaluated, as it is already known what the outcome is going to be.  
+Third, and last part of solution is - this expression will not actually return true of false, but will return the part of expression that was last evaluated. So the logic goes: if `args` value is falsy - go to right part of expression and return new object. But if on the other hand `args` are already initialized, no need to evaluate the other part, and args, as they were, are returned from expression.
+
+The same logic goes for checking if args have `playersList` value assigned to it. This way we can easly define default values.
+
+Is it perfect? Not necessarily - when there are multiple values passed and each has to be checked before using, the code gets nasty. Not in this case, but in complex classes that is going to happen. `jQuery` has a solution for that - [extend function](https://jporwol.wordpress.com/2016/02/26/til-jquery-extend-function/ "extend function"). I am however still dedicated to not using jQuery yet. For the moment above solution fits well enough, and if not - I will see if I can write something simillar to jQuery extend.

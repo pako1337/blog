@@ -1,0 +1,11 @@
+I have situation where it seemed useful to have data shared between two controllers. First controller is just a list of elements. Second is edit controller to adjust values of elements. I could have just loaded this single element back from server and it would be fine and probably pretty fast as well. But why, I have all the data I need just here. Why cannot I use it? Well - sure I can, I can go with shared variable, as was my initial idea:
+[gist]6797385[/gist]
+Code is pretty straightforward: module definition with routing, two controllers: list one, that gets the data and edit one - which just picks the data from already downloaded values.
+
+Have you coded for few months even, I bet you heard that global variables are no good. And sure they are, global state is always hard to manage. So can we do something with this? AngularJs have two great things that will help us solve this issue: incjector and factories. You can look through their documentation, but put simply: you can define some factories in module and then use parameters named like those factories and injector will automatically fill those parameters for you. Simple, classy, easy to code. Just look:
+[gist]6797491[/gist]
+A bit more code there, but still easy to understand, don't you think? We declare factory on module, named `contentProvider` and then we use parameter with the same name in controller's constructor - Angular will put the instance returned from factory there for us.
+
+But wait, that won't work - factory will return new value each time, right? Well, no - Angular is clever enough to limit instance just to one and reuse it each time. Our list will get the data and edit will have it ready when needed.
+
+Can you see the issue here? The most obvious one, for me, is that if we tried going directly to `/edit/1` page for example it will fail - we skipped list page so the data was never downloaded. But I'm sure we can do something about that and it will be fairly easy. Angular will do its best to assist us.

@@ -1,0 +1,99 @@
+As the project is moving forward there are new files appearing. There are few javascript files now, and I know there are going to be more to come. This is bit of an issue - more files mean more requests to server, which directly causes slower loading time. Browsers can only do so many concurrent requests, if you will require more files than browser limit, you will have to wait for previous request to complete. On server it is also more stressing to serve dozen requests for different files than to give one file and be done with it.
+
+With Visual Studio 2015 comes built in support for task running. There are few task systems available, most popular being `Grunt` and `Gulp`. They support various javascript written tasks and you can always write your own one, doing what you need. They may be used for anything, but I will get them to do bundling for me.
+
+Bundling is process of merging multiple files into one resource, that can then be used on page. In my case I want to get all my javascript files bundled, but css can also be merged if you want. I've picked `Gulp` as my poison of choice.
+
+First thing that has to be done is to create `packages.json` file - Visual studio has template file to support that. Second - `gulpfile.js` - in this file I will be defining my tasks, gulp automatically looks for this file for list of tasks. So does task runner explorer (you can turn its window on in View-Other Windows-Task Runner Explorer, or by pressign `Ctrl+Alt+Backspace`).
+
+What I need is some task definitions downloaded by `npm` - node js package manager. To do this I write what I need in `packages.json`
+
+```javascript
+{
+	"version": "1.0.0",
+	"name": "ASP.NET",
+	"private": true,
+  "devDependencies": {
+    "gulp": "3.9.1",
+    "gulp-concat": "2.6.0",
+    "gulp-concat-css": "2.2.0",
+    "del": "2.2.0"
+  }
+}
+```
+
+DevDependencies is the section of interest here. I will be using `gulp` to run tasks, `gulp-concat` for javascript files and `del` for removing unnecessary files. You can right on this file in Solution Explorer and restore packages. They will appear in node_modules directory.
+
+Now it is time to write some tasks in gulp. First - it needs to import required tasks (the ones that were references through packages.json):
+
+```javascript
+var gulp = require('gulp');
+var concat = require('gulp-concat');
+var concatCss = require('gulp-concat-css');
+var del = require('del');
+```
+
+And after that tasks can be defined:
+
+```javascript
+var bundlesOutputDir = "Bundles";
+
+var bundles = [
+    { scripts: ["Content/raim.js", "Content/PlayersList.js"], output: "raim_main.js"}
+];
+
+gulp.task('clean', function () {
+    del(bundlesOutputDir + '/*');
+});
+
+gulp.task('bundling', function () {
+    bundles.forEach(function (bundle) {
+        gulp.src(bundle.scripts)
+            .pipe(concat(bundle.output))
+            .pipe(gulp.dest(bundlesOutputDir));
+    });
+});
+```
+
+Those are pretty basic. `clean` goes to defined output directory for bundles and removes all the files. `bundling` on the other hand iterates over my array of bundles I want to create (which at the moment only holds one thing), loads those files (or marks them as files to process), pipes (forwards) them to `concat` task, which handles merging files and creates new file with name passed as parameter. This newly created file is then piped to `gulp.dest` task, which outputs it to target directory.
+
+When ran from task explorer it sure does create `raim_main.js` file in `Bundles` directory!
+
+But bundling by hand is not what I want to do. This should be done automatically, each time I change any file. I want to have them ready for use the second I stop writing them. For this, `gulp.watch` is perfect:
+
+```javascript
+gulp.task("watch", function () {
+    bundles.forEach(function (bundle) {
+        gulp.watch(bundle.scripts, ['clean', 'bundling']);
+    });
+});
+
+gulp.task('default', ['clean', 'bundling', 'watch']);
+```
+
+Again, going through all bundles, I mark those files for watch process and each time any of those files change I want to trigger clean task and later bundling. Additionally, default task is created to run those tasks automatically when gulp is ran as parameter (e.g. from console or during build process on CI machine).
+
+Triggering `default` task prepares working space for me, old bundles removed, new ones created and watch configured.
+
+But what about newly cloned repository, if someone downloads it? Or if I restart visual studio - I don't want to have to go to task explorer and trigger those tasks. Thankfully Visual Studio supports biding tasks to few events in VS, one of those being - project opened. It is done simply by providing special structure in comment at top of the file:
+
+```javascript
+/// <binding ProjectOpened='default' />
+```
+
+There can be comma separated list of tasks to run on start, but I just need one at the moment. This way if I unload the project, kill task running in background, and reload main project again - default tasks kicks in automatically, preparing workspace. Neat!
+
+What is left is to reference the bundle from html file:
+
+```html
+<script type="text/javascript" src="../Bundles/raim_main.js"></script>
+```
+
+And it should be... wait - no. Scripts are in Bundles directory, but Nancy wont be serving those files. What it needs is some configuration to tell it there is static content there. One line in `Bootstrap` file:
+
+
+```csharp
+nancyConventions.StaticContentsConventions.AddDirectory("Bundles");
+```
+
+And only now all is running smoothly.

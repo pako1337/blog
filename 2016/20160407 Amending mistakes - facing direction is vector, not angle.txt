@@ -1,0 +1,43 @@
+OK, so let's be honest. Angle option from previous post is not the best idea. It's not very bad I think, but there are few problems with it.
+
+First one - angles are not very useful once you think about it. If you want to draw something - you have to calculate the points, which means `sin` and `cos` math all over the place. Will get complex soon and is easy to get wrong.
+
+Talking about wrong. Dot product from previous post is great for calculating angles, it really is. It just has one tiny caveat in 2D - the values will always be between 0 and 180 degrees. Once I looked at math and thought for a minute or two this became painfully obvious:
+
+```javascript
+var vector = { x: mouse.x - p.Position.X, y: mouse.y - p.Position.Y };
+var vectorLength = vector.x * vector.x + vector.y * vector.y;
+vectorLength = Math.sqrt(vectorLength);
+vector.x = vector.x / vectorLength;
+vector.y = vector.y / vectorLength;
+var screenVector = { x: 1, y: 0};
+
+var dotProduct = vector.x * screenVector.x + vector.y * screenVector.y;
+```
+
+Well, the last part can be simplified to:
+
+```javascript
+var dotProduct = vector.x * 1 + vector.y * 0;
+```
+
+So basically `var dotProduct = vector.x` and this can only be between `-1` and `1` (this is unit vector after all). D'uh! Basic math.
+
+So what seems to be better aproach? Of course vector - the one that's already built for calculating dot product. I can simply use it to indicate direction player is facing. Code gets simpler - gain. Code actually works - gain. Drawing direction in which player is lookign gets very simple - gain.
+
+```javascript
+drawingContext.beginPath();
+
+drawingContext.strokeStyle = "#0F0";
+
+var x = gameObject.Position.X + gameObject.FacingDirection.X * gameObject.Size / 2;
+var y = gameObject.Position.Y + gameObject.FacingDirection.Y * gameObject.Size / 2;
+drawingContext.moveTo(x, y);
+
+x = gameObject.Position.X + gameObject.FacingDirection.X * gameObject.Size;
+y = gameObject.Position.Y + gameObject.FacingDirection.Y * gameObject.Size;
+drawingContext.lineTo(x, y);
+drawingContext.stroke();
+```
+
+So much gained by making things easier.

@@ -1,0 +1,28 @@
+Sometimes you cannot write simple generic code like `Method<T>()`. When is that? Well - in unit tests for example. Imagine you have test that needs to run multiple times - each time for different type. Solution I've witnessed in production code is to write separate test for every type and copy-paste the code around. Terrible, terrible solution!
+
+Another way could be to create separate tests, but extract common code to external method - now we can use generics - and just call that method. Much better, but still - having dozen methods just to call other one? There must be a better way!
+
+And surely there is - data driven tests. `[TestCase]` in NUnit, `[Theory]` with for example `[InlineData]` in XUnit or even poor `[DataSource]` in MSTest. But it cannot pass generics, test method cannot be generic.
+
+So I looked why exactly this test requires generic type. It all comes to this
+
+
+```csharp
+try
+{
+    T result = (T)variable;
+}
+catch (Exception)
+{
+    Assert.Fail();
+}
+```
+
+So just casting to see if object is of given type. I didn't want to mess with test logic to much, just to reduce code quantity. So how do you write casting code without generics and knowing just the type (because we can of course get `Type` variable as parameter)? Simple as that:
+
+
+```csharp
+object result = Convert.ChangeType(variable, type);
+```
+
+Is it perfect? Of course not - it returns object because it does not know the type it's casting to. It might not be all that useful then. But in my case - it fits perfectly. Throws the same exceptions if casting is not possible, verifies if object can be assigned to variable of given type as the old code did. And now I can just have one test method with dozen test cases in it!

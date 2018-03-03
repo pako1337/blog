@@ -1,0 +1,116 @@
+In game I would like every player to have more or less the same game experience. And, most importantly, I want players to have the same chance of winning, and not limiting players' skills based on their devices etc. One of the things that need to be handled is visible game arena size. Ideally players with ultra HD screens and players with smaller laptop screens with 1600 over 900 for example should all see the same part of game arena, to not make players on bigger screens have it easier to spot enemies. This means there needs to be standard game size defined. But that would mean that some players would have only part of their screen space used for game, while others would have to scroll to see whole content - that makes terrible user experience. Scaling should solve the problem!
+
+OK, first things first. I have to define base game arena size to server as reference. On screen with this resolution scaling factor should be equal to one. This could possibly be any set of two numbers (width and height), not corresponding to any particular screen size, but I've decided to base it on my full hd screen, or to be more precise, on my canvas size on Raim page - 1600 over 861 (with some space being taken over by address bar, developer tools, icons etc.).
+
+```javascript
+var originalSize = { x: 1600, y: 861 };
+var scale = 1;
+```
+
+Then, it is time to scale canvas on page when size of browser changes, so that resizing window will cause scale to change.
+
+
+```javascript
+var resizeCanvas = function () {
+	var arenaElement = document.getElementById(arenaHandler);
+	var widthDiff = originalSize.x - arenaElement.offsetWidth;
+	var heightDiff = originalSize.y - arenaElement.offsetHeight;
+
+	var aspectRatio = originalSize.x / originalSize.y;
+	var w, h;
+
+	if (Math.abs(widthDiff) > Math.abs(heightDiff)) {
+		w = arenaElement.offsetWidth;
+		h = w / aspectRatio;
+	} else {
+		h = arenaElement.offsetHeight;
+		w = h * aspectRatio;
+	}
+
+	canvas.width = w;
+	canvas.height = h;
+
+	scale = canvas.width / originalSize.x;
+};
+
+(function init() {
+	...
+	
+	var arenaElement = document.getElementById(arenaHandler);
+	viewport.x = 0;
+	viewport.y = arenaElement.offsetHeight;
+
+	canvas = document.createElement("canvas");
+	document.getElementById(arenaHandler).appendChild(canvas);
+	resizeCanvas();
+
+	window.addEventListener('resize', resizeCanvas);
+
+	gfx = new raimGraphics({
+		canvas: function () { return canvas; },
+		viewport: function () { return viewport; },
+		arena: function () { return arena; },
+		scale: function () { return scale; }
+	});
+
+	...
+})();
+```
+
+Calculating the scale is not too hard. There is aspect ratio I want to hold (calculated as width divided by height). Given that, if I have new screen width, I can calculate screen height by dividing width by this ascpect ratio. Holding aspect ratio will ensure that graphics don't get distorted in any axis (e.g. circles do not turn into elipses). The calculation formula is simply taken from proportion:
+
+```
+newWidth / newHeight = originalWidth / originalHeight
+newHeight = newWidth / (originalWidth / originalHeight)
+```
+
+With new scale calculated, drawing graphics is as simple as multiplying every coordinate by this scale, for example:
+
+
+```javascript
+...
+x = player.Position.X + args.viewport().x;
+y = player.Position.Y + args.viewport().y;
+drawingContext.arc(x * scale, -y * scale, player.Size * scale, 0, 2 * Math.PI);
+
+...
+
+var x = points[0].X + args.viewport().x;
+var y = -(points[0].Y + args.viewport().y);
+drawingContext.moveTo(x * scale, y * scale);
+for (var i = 1; i < points.length; i++) {
+	x = points[i].X + args.viewport().x;
+	y = -(points[i].Y + args.viewport().y);
+	drawingContext.lineTo(x * scale, y * scale);
+}
+
+x = points[0].X + args.viewport().x;
+y = -(points[0].Y + args.viewport().y);
+drawingContext.lineTo(x * scale, y * scale);
+```
+
+Easy! Is that it? Well, no. There is also user input to be taken into account - mouse movement and mouse clicks are used in application and game required coordinates to be handled in game world coordinates, not screen coordinates. So what needs to happen is - mouse coordinates have to be scaled accordingly. Does this mean multiplying by game scale?  
+No. Since I've stretched game twice (for player with big screen) and user clicks in coordinate [10, 10] on the screen, it must be [5, 5] coordinate in game world (remember - game world got stretched two times). It makes sense - if I put stuff onto the screen, I multiply it by scale. If I get it from back the screen, I have to devede the value back by reversing the operations.
+
+
+```javascript
+var inputChange = function (input) {
+	var player = getCurrentPlayer();
+	if (player == undefined) return;
+
+	input.mouse.x /= scale;
+	input.mouse.y /= scale;
+	input.mouse.x = input.mouse.x - viewport.x;
+	input.mouse.y = -input.mouse.y - viewport.y;
+	...
+}
+```
+
+And just one more fix - in my calculations of viewport I was taking canvas size into account. Since canvas account is no longer a real game world size, I cannot take it into account. But thankfully there is game world size already there - `originalSize`, so that makes viewport calculation really easy:
+
+```javascript
+viewport.x = originalSize.x / 2 - currentPlayer.Position.X;
+viewport.y = -originalSize.y / 2 - currentPlayer.Position.Y;
+```
+
+And now game scales on every window sizes!

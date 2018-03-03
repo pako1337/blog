@@ -1,0 +1,57 @@
+All that's left is to limit spped of shooting for player. Producing possibly dozens of bullets every second is not what I want in my game. At some point there may be weapons that will allow shooting different amount of bullets per second, then I will simply change my mechanism to support that. Right now there needs to be basic solution in place.
+
+And with a little thinking it seems to be realy easy to achieve. I have the time when the shot happened, I can store last shot time and just check if this happens to be earlier than available shooting rate.
+
+```csharp
+public IEnumerable<IGameObject> ProcessInput(PlayerInput input, DateTime updateTime)
+{
+	ProcessDirection(input.KeysInput);
+	FacingDirection = input.FacingDirection;
+
+	var createdObjects = new List<IGameObject>();
+
+	if (input.KeysInput.HasFlag(KeysInput.MouseLeft))
+	{
+		Shoot(createdObjects, updateTime);
+	}
+
+	return createdObjects;
+}
+
+private DateTime _lastShot = DateTime.Now;
+private void Shoot(List<IGameObject> createdObjects, DateTime shotTime)
+{
+	if (shotTime - _lastShot < TimeSpan.FromMilliseconds(500))
+		return;
+
+	var bullet = Bullet.Create(Position.X, Position.Y, FacingDirection);
+	Bullets.Add(bullet);
+	createdObjects.Add(bullet);
+
+	_lastShot = shotTime;
+}
+```
+
+And small modification to hub to pass update time parameter correctly. This may become usefull later as well, for other actions.
+
+```csharp
+public void PlayerMoving(PlayerInput input)
+{
+	var updateTime = DateTime.Now;
+	UpdateGameState(updateTime);
+	var player = players[Context.ConnectionId];
+	var createdObjects = player.ProcessInput(input, updateTime);
+	gameObjects.AddRange(createdObjects);
+	Clients.All.PlayerMoved(gameObjects);
+}
+
+private void UpdateGameState(DateTime? updateTimestamp = null)
+{
+	var updateTime = updateTimestamp ?? DateTime.Now;
+
+	foreach (var player in gameObjects)
+		player.Update(updateTime);
+}
+```
+
+If input processing happens, there is update time created in call and passed to input processing as well as game state updating. If other events are processed, game state update will get the time to use in calculations.

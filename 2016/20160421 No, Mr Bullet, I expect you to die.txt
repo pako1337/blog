@@ -1,0 +1,60 @@
+There are some objects that I want to live for some time and then disappear. Bullets would be one of them. They serve a purpose for a time, but once they (a) hit another object, or (b) reach their lifespan, they should disappear. My first idea was to store creation time, get actual time and check whether the lifespan of bullet is reached. What sounded like a good idea at first, and actually worked on server side, is quite hard to do on client side. Well, to do it is easy. The hard part is synchronizing client and server time. And this would be priority - getting time wrong would mean client side would render bullet for too long or too short. Either way it would be terrible experience.
+
+And then, while cleaning my teeth, it hit me. I was looking at this completely wrong. I'm not interested in how much time has passed since object creation. What I want to know is how long object has to live. Basically Time To Live, similar to what you might know from pinging or other web protocols. And implementation is even simpler.
+
+```csharp
+public void Update(DateTime updateTime)
+{
+	if (TimeToLive <= 0)
+	{
+		IsDestroyed = true;
+		return;
+	}
+
+	var changeTime = updateTime;
+	var timeBetweenEvents = changeTime - lastUpdate;
+
+	Position.X += Speed.X * timeBetweenEvents.TotalSeconds;
+	Position.Y += Speed.Y * timeBetweenEvents.TotalSeconds;
+
+	TimeToLive -= (int)timeBetweenEvents.TotalMilliseconds;
+	lastUpdate = changeTime;
+}
+```
+
+And on client side as well:
+
+```javascript
+var processFrame = function (timestamp) {
+	if (!lastFrameTime)
+		lastFrameTime = timestamp;
+	
+	var timeDiff = (timestamp - lastFrameTime) / 1000;
+
+	for (var i = 0; i < gameObjects.length; i++) {
+		var gameObject = gameObjects[i];
+
+		if (!gameObject.IsDestroyed) {
+			var directionPoint = { x: gameObject.Position.X + gameObject.FacingDirection.X, y: gameObject.Position.Y + gameObject.FacingDirection.Y };
+			gameObject.Position.X += gameObject.Speed.X * timeDiff;
+			gameObject.Position.Y += gameObject.Speed.Y * timeDiff;
+			gameObject.FacingDirection = calculateFacingDirection(gameObject, directionPoint);
+
+			if (!!gameObject.TimeToLive) {
+				gameObject.TimeToLive -= timestamp - lastFrameTime;
+				if (gameObject.TimeToLive <= 0)
+					gameObject.IsDestroyed = true;
+			}
+		}
+	}
+
+	gameObjects = gameObjects.filter(function (g) { return !g.IsDestroyed });
+
+	gfx.drawArena(gameObjects);
+
+	lastFrameTime = timestamp;
+	requestAnimationFrame(processFrame);
+};
+```
+
+Once again it has been proven that oral hygiene is goon not just for your teeth but your whole body!

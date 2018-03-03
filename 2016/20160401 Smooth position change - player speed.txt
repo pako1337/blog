@@ -1,0 +1,87 @@
+Player can now move over the screen. But it does not feel right. If I set speed of movement to 10 - player moves in jumps - 10 pixels at time, at whatever rate SignalR can push messages and browser repaints screen. No game can work like that! Problem is quite obvious here - player's key press cannot trigger move. Instead it has to trigger speed change - in whatever direction player requsted. And this speed in turn can cause movement.
+
+First few fixes to code:
+
+```javascript
+function keyboardInput(args) {
+    var keyPressed = 0;
+
+    var keyDown = function (e) {
+        var key = keyPressed;
+		// ...
+		// as it was before
+		// ...
+
+        if (keyPressed !== key)
+            args.inputChanged({ direction: keyPressed });
+    };
+
+
+    var keyUp = function (e) {
+        var key = keyPressed;
+		// ...
+		// as it was before
+		// ...
+
+        if (keyPressed !== key)
+            args.inputChanged({ direction: keyPressed });
+    };
+
+    (function () {
+        document.addEventListener("keydown", keyDown);
+        document.addEventListener("keyup", keyUp);
+    })();
+};
+```
+
+What changed is - the cases when user presses keys are now handled better. `keydown` causes communication to server only in case when user changed keys that are being pressed. In other words - if he or she smashes down arrow and holds on to it - key press event will not be triggered and sent to server. But if player adds left key to the combo - then it will.
+
+Second change is in `keyUp` function. Previously, the condition was - key pressed has to be greater than zero, meaning  - at least one key has to be pressed. But what about last key? If last key is released there are no more keys, `keyPressed` variable will be `0` and will not communicate that to server. With movement working as pixel position change all seems to work due to the fact that key pressed events are not being sent to server any more (in old code version) - thus stopping player movement. But after changing player movement to speed based idea - it would certainly not work - server would never get notified that player released last key and speed needs to be deduced.
+
+With that fixed, it is time to extend player's class a little bit.
+
+```csharp
+public class Player
+{
+	private const int MaxSpeed = 10;
+	public string Name { get; private set; }
+	public Vector2d Position { get; private set; }
+	public Vector2d Speed { get; private set; }
+	public int Size { get; private set; }
+
+	private Player() { }
+
+	public static Player Create(string name, int x, int y)
+	{
+		return new Player
+		{
+			Name = name,
+			Position = new Vector2d(x, y),
+			Speed = new Vector2d(0, 0),
+			Size = 20,
+		};
+	}
+
+	public void ChangeSpeed(MoveDirection direction)
+	{
+		if (direction.HasFlag(MoveDirection.Up))
+			Speed.Y = -MaxSpeed;
+		if (direction.HasFlag(MoveDirection.Down))
+			Speed.Y = MaxSpeed;
+		if (direction.HasFlag(MoveDirection.Right))
+			Speed.X = MaxSpeed;
+		if (direction.HasFlag(MoveDirection.Left))
+			Speed.X = -MaxSpeed;
+	}
+}
+```
+
+Player got `Speed` property, which is updated accordingly to the keys that player pressed in browser.
+
+OK, but this stopped player from moving at all. Why is that? Well, speed is modified, but not position, and position changing is what is being displayed on screen. This can now be tackled in two ways: we can loop on server in infinite loop, calculating new position based on player's speed and time that has passed since last position change, or we can do the same on user side, in browser. Doing this stuff on server has the benefit of all players being notified about other player's position consistently, everyone gets the same data from server and there are no discussions abouth whether results are correct or not. But - that would make code very server-heavy, power consuming.
+
+Calculating position on players' machines has the benefit of smooth animation - they can calculate positions and change them immediately without having to wait for server communication to happen. But - it may be that players will not agree on each other's positions. May it be due to glitch in calculations, messge about speed change being lost or (God forbid!) some players cheating - the code is on their machine so what's stoppig them?
+
+Actually - I think the truth is in the middle. It is most certainly worth to animate position change on client side and use browser to update positions. But every once in a while those positions have to be synced with server and propagated to all players, making sure server is the final source of the truth. If the player experienced some problems with his or her machine, or if he or she tried to cheat, it would only happen on their machine and not on server - which would re-send their correct position to everyone.
+
+Next time I will try to get some animations working to make it all start moving smoothly.
